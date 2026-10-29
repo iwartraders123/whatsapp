@@ -1,0 +1,1277 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>WhatsApp Broadcast Manager</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: left rail on desktop, bottom bar on phones. One content column, teal-green on pale gray, WhatsApp-style chat preview as the signature element. */
+:root{
+  --bg:#EDF1EF; --surface:#FFFFFF; --surface-2:#F4F7F5; --fg:#10201B; --muted:#586A63; --line:#DCE4E0;
+  --brand:#0B7A62; --brand-strong:#075E4C; --brand-soft:#DDF3E8; --on-brand:#FFFFFF; --wa:#25D366;
+  --wa-head:#075E54; --wa-head-fg:#FFFFFF; --bubble:#D9FDD3; --bubble-fg:#10201B; --chat-bg:#EFE7DC; --chat-dot:#E1D7C8;
+  --good:#157F4A; --good-soft:#DDF3E8; --warn:#8A5700; --warn-soft:#FFEFC7; --bad:#B3261E; --bad-soft:#FCE4E1; --on-bad:#FFFFFF;
+  --info:#1F5E99; --info-soft:#E1EDF9; --focus:#1A73E8;
+  --seg-read:#0B7A62; --seg-delivered:#52BFA0; --seg-sent:#B5C7C0; --seg-failed:#C7473D;
+  --shadow:0 1px 2px rgba(16,32,27,.06),0 6px 18px rgba(16,32,27,.05);
+  --font-display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1310; --surface:#111C18; --surface-2:#172420; --fg:#E7EFEB; --muted:#9BADA5; --line:#243630;
+    --brand:#25C48A; --brand-strong:#4FD8A4; --brand-soft:#143328; --on-brand:#04180F;
+    --wa-head:#1F2C34; --wa-head-fg:#E7EFEB; --bubble:#144D3F; --bubble-fg:#E7EFEB; --chat-bg:#0D1814; --chat-dot:#132520;
+    --good:#4FD8A4; --good-soft:#143328; --warn:#F0B84A; --warn-soft:#3A2D10; --bad:#FF8A80; --bad-soft:#40201D; --on-bad:#2A0A08;
+    --info:#86BDF5; --info-soft:#162B42; --focus:#8AB4F8;
+    --seg-read:#25C48A; --seg-delivered:#1C8A66; --seg-sent:#4A5E56; --seg-failed:#E5675D;
+    --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1310; --surface:#111C18; --surface-2:#172420; --fg:#E7EFEB; --muted:#9BADA5; --line:#243630;
+  --brand:#25C48A; --brand-strong:#4FD8A4; --brand-soft:#143328; --on-brand:#04180F;
+  --wa-head:#1F2C34; --wa-head-fg:#E7EFEB; --bubble:#144D3F; --bubble-fg:#E7EFEB; --chat-bg:#0D1814; --chat-dot:#132520;
+  --good:#4FD8A4; --good-soft:#143328; --warn:#F0B84A; --warn-soft:#3A2D10; --bad:#FF8A80; --bad-soft:#40201D; --on-bad:#2A0A08;
+  --info:#86BDF5; --info-soft:#162B42; --focus:#8AB4F8;
+  --seg-read:#25C48A; --seg-delivered:#1C8A66; --seg-sent:#4A5E56; --seg-failed:#E5675D;
+  --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
+body.lock{overflow:hidden}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:-.01em;text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(1.55rem,4.2vw,2.05rem);font-weight:700}
+h2{font-size:1.15rem;font-weight:650}
+h3{font-size:1rem;font-weight:650}
+p{margin:0}
+a{color:var(--brand)}
+.muted{color:var(--muted)} .small{font-size:.85rem} .num{font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+[hidden]{display:none!important}
+.stack{display:grid;gap:16px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.between{justify-content:space-between}.row.end{justify-content:flex-end}
+.grow{flex:1 1 0;min-width:0}
+
+/* shell */
+.shell{display:grid;gap:16px;max-width:1280px;margin:0 auto}
+.side{display:none}
+main{min-width:0;display:grid;gap:20px;align-content:start;padding-bottom:96px}
+@media(min-width:960px){
+  .shell{grid-template-columns:240px minmax(0,1fr);gap:28px}
+  .side{display:flex;flex-direction:column;gap:18px;position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;padding:4px}
+  main{padding-bottom:32px}
+  .bottom{display:none!important}
+}
+.brand{display:flex;gap:10px;align-items:center;text-decoration:none;color:var(--fg)}
+.mark{width:38px;height:38px;border-radius:12px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;flex:none}
+.brand b{font-family:var(--font-display);font-size:1.05rem;line-height:1.1;display:block}
+.brand small{color:var(--muted);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.side nav{display:grid;gap:2px}
+.side nav a{display:flex;gap:12px;align-items:center;min-height:44px;padding:0 12px;border-radius:12px;color:var(--fg);text-decoration:none;font-weight:550}
+.side nav a:hover{background:var(--surface)}
+.side nav a[aria-current=page]{background:var(--brand-soft);color:var(--brand);font-weight:650}
+.side-foot{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--line)}
+.who{display:flex;gap:10px;align-items:center;min-width:0}
+.who b{display:block;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who small{color:var(--muted);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.av{width:38px;height:38px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:.85rem;flex:none}
+.mobhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+@media(min-width:960px){.mobhead{display:none}}
+
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bottom a,.bottom button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;text-decoration:none;border-radius:12px;cursor:pointer}
+.bottom [aria-current=page]{color:var(--brand)}
+.bottom .fab span.disc{width:52px;height:52px;margin-top:-22px;border-radius:50%;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;box-shadow:0 4px 14px rgba(11,122,98,.35)}
+.bottom .fab{color:var(--fg)}
+
+/* page */
+.phead{display:flex;gap:14px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap}
+.phead p{color:var(--muted);margin-top:4px;max-width:60ch}
+.demo{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-radius:14px;background:var(--warn-soft);color:var(--warn);font-size:.88rem}
+.demo a{color:inherit;font-weight:650}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow);min-width:0}
+.card.flush{padding:0;overflow:hidden}
+.card>header,.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.card.flush>.card-h{padding:16px 18px 0;margin-bottom:8px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;text-decoration:none;color:var(--fg);white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.btn.primary:hover{background:var(--brand-strong);border-color:var(--brand-strong)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:var(--on-bad)}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.sm{min-height:38px;padding:0 12px;font-size:.88rem;border-radius:10px}
+.btn.lg{min-height:54px;font-size:1.05rem;padding:0 26px;border-radius:14px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.icon-btn{width:40px;height:40px;display:inline-grid;place-items:center;border-radius:10px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{background:var(--surface-2);color:var(--fg)}
+.icon-btn.bad:hover{color:var(--bad)}
+
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:650;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.info{background:var(--info-soft);color:var(--info)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:2px 9px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);font-size:.78rem;color:var(--muted)}
+
+/* forms */
+.field{display:grid;gap:6px;min-width:0}
+.field>label,.lbl{font-weight:600;font-size:.88rem}
+.in{width:100%;min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);min-width:0}
+.in:focus{border-color:var(--brand)}
+textarea.in{min-height:190px;resize:vertical;line-height:1.5}
+.hint{font-size:.82rem;color:var(--muted)}
+.err{font-size:.85rem;color:var(--bad);min-height:0}
+.check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;min-height:40px;cursor:pointer}
+.check input,.gchk input{width:20px;height:20px;accent-color:var(--brand);flex:none;margin-top:2px}
+.check small{display:block;color:var(--muted)}
+.formgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.emojis{display:flex;flex-wrap:wrap;gap:2px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.emojis button{width:40px;height:40px;border:0;background:transparent;font-size:1.3rem;border-radius:8px;cursor:pointer}
+.emojis button:hover{background:var(--surface)}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);gap:2px;flex-wrap:wrap}
+.seg button{min-height:38px;padding:0 14px;border:0;border-radius:9px;background:transparent;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button[aria-selected=true]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow)}
+
+/* stats & bars */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.stat small{display:block;color:var(--muted);font-weight:600;font-size:.8rem}
+.stat b{display:block;font-family:var(--font-display);font-size:1.9rem;line-height:1.15;font-variant-numeric:tabular-nums;margin-top:2px}
+.stat span{font-size:.8rem;color:var(--muted)}
+.cta{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--brand);color:var(--on-brand);border-radius:20px;padding:20px}
+.cta h2{font-size:1.35rem}.cta p{opacity:.9;margin-top:4px;max-width:44ch}
+.cta .btn{background:var(--surface);color:var(--brand);border-color:transparent}
+.sbar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--surface-2)}
+.sbar i{display:block;height:100%}
+.legend{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend b{color:var(--fg);font-variant-numeric:tabular-nums}
+.prog{height:12px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.prog>div{height:100%;background:var(--brand);transition:width .3s}
+
+/* lists */
+.list{list-style:none;margin:0;padding:0}
+.crow{display:grid;grid-template-columns:40px minmax(0,1fr) auto;grid-template-areas:"av main acts" ". meta meta";gap:4px 12px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+.crow .av{grid-area:av}.crow .main{grid-area:main;min-width:0}.crow .meta{grid-area:meta;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.crow .acts{grid-area:acts;display:flex}
+.crow .main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow .main span{display:block;color:var(--muted);font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(min-width:780px){
+  .crow{grid-template-columns:40px minmax(0,1.2fr) minmax(0,1.3fr) auto;grid-template-areas:"av main meta acts"}
+  .crow .meta{justify-content:flex-start}
+}
+.toolbar{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));padding:0 18px 14px}
+.toolbar .wide{grid-column:1/-1}
+@media(min-width:780px){.toolbar .wide{grid-column:span 2}}
+.empty{padding:28px 18px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);margin-bottom:4px}
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.cards .card{display:grid;gap:10px;align-content:start}
+.tbody{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;color:var(--muted);max-height:7.5em;overflow:hidden}
+
+details.camp{border-top:1px solid var(--line)}
+details.camp>summary{list-style:none;cursor:pointer;display:grid;gap:6px 12px;grid-template-columns:minmax(0,1fr) auto;padding:14px 18px;align-items:center}
+details.camp>summary::-webkit-details-marker{display:none}
+details.camp>summary .nm{min-width:0}
+details.camp>summary .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.camp>summary .nm span{color:var(--muted);font-size:.85rem}
+details.camp>summary .sc-row{grid-column:1/-1;display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.88rem;color:var(--muted)}
+details.camp>summary .sc-row b{color:var(--fg);font-variant-numeric:tabular-nums}
+details.camp[open]>summary{background:var(--surface-2)}
+.cbody{padding:16px 18px 20px;display:grid;gap:16px;background:var(--surface-2)}
+.mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.mini div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.mini small{display:block;color:var(--muted);font-size:.78rem}
+.mini b{font-family:var(--font-display);font-size:1.3rem;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+table.t{border-collapse:collapse;width:100%;font-size:.88rem}
+table.t th,table.t td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em}
+code{background:var(--surface-2);padding:2px 6px;border-radius:6px;border:1px solid var(--line);overflow-wrap:anywhere}
+
+/* composer */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.steps button{flex:1 1 140px;min-height:48px;display:flex;gap:10px;align-items:center;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;color:var(--muted);text-align:left}
+.steps button i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);font-size:.8rem;flex:none}
+.steps button[aria-current=step]{color:var(--fg);border-color:var(--brand)}
+.steps button[aria-current=step] i,.steps button.done i{background:var(--brand);color:var(--on-brand)}
+.compose{display:grid;gap:20px;align-items:start}
+.compose>*{min-width:0}
+@media(min-width:1180px){.compose{grid-template-columns:minmax(0,1fr) 340px}.compose aside{position:sticky;top:16px}}
+.phone{border:1px solid var(--line);border-radius:22px;overflow:hidden;background:var(--chat-bg);box-shadow:var(--shadow)}
+.phone-head{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--wa-head);color:var(--wa-head-fg)}
+.phone-head .av{width:34px;height:34px;background:rgba(255,255,255,.18);color:inherit}
+.phone-head b{display:block;line-height:1.2}.phone-head small{opacity:.8}
+.chat{padding:16px 12px 20px;min-height:220px;background-color:var(--chat-bg);background-image:radial-gradient(var(--chat-dot) 1.2px,transparent 1.4px);background-size:18px 18px}
+.bubble{max-width:94%;margin-left:auto;background:var(--bubble);color:var(--bubble-fg);border-radius:12px 12px 3px 12px;padding:6px 8px 5px;box-shadow:0 1px 1px rgba(0,0,0,.14)}
+.btext{padding:2px 4px;overflow-wrap:anywhere;font-size:.93rem}
+.bmeta{display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:.7rem;opacity:.7;padding:0 2px}
+.bubble img{display:block;width:100%;border-radius:8px;margin-bottom:4px}
+.fileblk{display:flex;gap:10px;align-items:center;background:rgba(0,0,0,.07);border-radius:8px;padding:10px;margin-bottom:4px;font-size:.85rem;min-width:0}
+.fileblk span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gpick{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.gchk{display:flex;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;cursor:pointer;align-items:flex-start}
+.gchk:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.gchk small{display:block;color:var(--muted)}
+.plist{list-style:none;margin:8px 0 0;padding:0;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.plist li{border-bottom:1px solid var(--line);padding:0 12px}.plist li:last-child{border:0}
+.plist .check{align-items:center}.plist .check>span:nth-child(2){flex:1;min-width:0}
+.sum{display:grid;gap:0}
+.sum div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
+.sum div:last-child{border:0}.sum dt{color:var(--muted)}.sum dd{margin:0;font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
+.callout{padding:12px 14px;border-radius:12px;font-size:.9rem}
+.callout.warn{background:var(--warn-soft);color:var(--warn)}.callout.info{background:var(--info-soft);color:var(--info)}.callout.bad{background:var(--bad-soft);color:var(--bad)}.callout.good{background:var(--good-soft);color:var(--good)}
+
+/* modal, toast */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(5,15,11,.55);display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--surface);color:var(--fg);width:100%;max-width:580px;max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;border-radius:22px 22px 0 0;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal.wide{max-width:760px}
+.modal>header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px 8px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+.mbody{padding:8px max(18px,env(safe-area-inset-right,0px)) 16px max(18px,env(safe-area-inset-left,0px));overflow:auto;display:grid;gap:14px}
+.modal>footer{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding:12px max(18px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));border-top:1px solid var(--line)}
+@media(min-width:640px){.scrim{align-items:center}.modal{border-radius:22px}}
+.sheetnav{display:grid;gap:4px}
+.sheetnav a,.sheetnav button{display:flex;gap:14px;align-items:center;min-height:52px;padding:0 12px;border-radius:12px;color:var(--fg);text-decoration:none;font-weight:600;background:none;border:0;cursor:pointer;text-align:left}
+.sheetnav a:hover,.sheetnav button:hover{background:var(--surface-2)}
+#toasts{position:fixed;left:0;right:0;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:60;display:grid;gap:8px;justify-items:center;pointer-events:none;padding:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+@media(min-width:960px){#toasts{bottom:24px}}
+.toast{pointer-events:auto;background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:460px;font-weight:550;display:flex;gap:10px;align-items:flex-start}
+.toast.bad{background:var(--bad);color:var(--on-bad)}.toast.good{background:var(--brand);color:var(--on-brand)}
+
+/* auth */
+.auth{min-height:calc(100vh - 32px);display:grid;place-items:center;padding-block:16px}
+.auth-card{width:100%;max-width:440px;display:grid;gap:18px;padding:24px}
+.auth-hero{display:grid;gap:6px}
+.auth-hero h1{font-size:1.7rem}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
+<div id="modal-root"></div>
+
+<style>
+.wa-opts{display:grid;gap:10px}
+@media(min-width:720px){.wa-opts{grid-template-columns:repeat(3,1fr)}}
+.wa-opt{display:grid;gap:4px;text-align:left;padding:14px;border:2px solid var(--line);border-radius:14px;background:var(--surface);cursor:pointer;min-height:44px}
+.wa-opt b{font-family:var(--font-display);font-size:1rem}.wa-opt span{color:var(--muted);font-size:.88rem}
+.wa-opt[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
+.ls-name{font-family:var(--font-display);font-size:1.2rem;font-weight:650}
+.ls-go{width:100%;justify-content:center;min-height:52px;font-size:1.05rem}
+</style>
+<script>
+(function(){
+'use strict';
+
+/* ---------- utilities ---------- */
+const KEY='wbm-demo-v1', DAY=864e5;
+const $=(s,el)=>(el||document).querySelector(s);
+const $$=(s,el)=>Array.from((el||document).querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let uidn=0;
+const uid=p=>p+Date.now().toString(36)+(uidn++).toString(36)+Math.random().toString(36).slice(2,5);
+const now=()=>Date.now();
+const sum=(a,f)=>a.reduce((n,x)=>n+(f(x)||0),0);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const dtf=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+const dtd=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'});
+const fmt=t=>t?dtf.format(new Date(t)):'—';
+const fmtD=t=>t?dtd.format(new Date(t)):'—';
+const nf=n=>Number(n||0).toLocaleString('en-IN');
+function rel(ts){const d=ts-now(),a=Math.abs(d);const m=Math.max(1,Math.round(a/6e4)),h=Math.round(a/36e5),dd=Math.round(a/DAY);
+  const t=a<36e5?m+' min':a<DAY?h+' h':dd+' day'+(dd===1?'':'s');return d>=0?'in '+t:t+' ago';}
+function toLocalInput(ts){const d=new Date(ts),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());}
+function initials(n){return String(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')||'?';}
+function size(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
+
+const IC={
+ home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+ users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+ send:'<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+ bar:'<path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>',
+ grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+ folder:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+ file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+ clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+ link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+ user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ search:'<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>',
+ trash:'<path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+ edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+ check:'<path d="M20 6L9 17l-5-5"/>',
+ x:'<path d="M18 6L6 18M6 6l12 12"/>',
+ clip:'<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+ smile:'<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
+ download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+ upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>',
+ moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+ logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+ alert:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+ refresh:'<path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+ copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+ shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+};
+const ic=(n,s)=>'<svg width="'+(s||20)+'" height="'+(s||20)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IC[n]+'</svg>';
+
+/* ---------- data ---------- */
+const PEOPLE=[
+ ['Anita Das','Das Fresh Mart',['g1'],'opted_in','Website form'],['Biswajit Mohanty','Mohanty Traders',['g1'],'opted_in','In-store form'],
+ ['Chandini Sahoo','Sahoo Super Bazaar',['g1'],'opted_in','WhatsApp opt-in'],['Debasis Panda','Panda Hotel & Caterers',['g1','g4'],'opted_in','In-store form'],
+ ['Ejaz Khan','Khan Provisions',['g1'],'opted_in','WhatsApp opt-in'],['Falguni Nayak','',['g2'],'opted_in','WhatsApp opt-in'],
+ ['Gopal Behera','Behera Agro',['g1'],'opted_out','WhatsApp opt-in'],['Haripriya Jena','Jena Sweets',['g1'],'opted_in','Website form'],
+ ['Itishree Patra','',['g3'],'opted_in','In-store form'],['Jagannath Rout','Rout Mart',['g4'],'pending','Imported list'],
+ ['Kabita Swain','',['g2'],'opted_in','WhatsApp opt-in'],['Lalit Mishra','Mishra Wholesale',['g4'],'opted_in','Website form'],
+ ['Manas Dash','',['g3'],'opted_in','In-store form'],['Namita Sethi','Sethi Retail',['g1'],'opted_in','Website form'],
+ ['Pratap Barik','Barik Foods',['g4'],'opted_in','Website form'],['Rashmi Tripathy','',['g3'],'opted_in','In-store form'],
+ ['Sanjay Lenka','Lenka Stores',['g1'],'opted_out','WhatsApp opt-in'],['Tapaswini Muduli','',['g3'],'opted_in','In-store form'],
+ ['Umesh Nanda','Nanda Enterprises',['g4'],'opted_in','Website form'],['Veena Pradhan','',['g2'],'opted_in','WhatsApp opt-in'],
+ ['Bhaskar Rath','Rath Cold Chain',['g4'],'pending','Imported list'],['Smita Acharya','Acharya Mart',['g1'],'opted_in','Website form'],
+ ['Ranjan Biswal','',['g2'],'opted_in','WhatsApp opt-in']
+];
+const GENERAL='Hello {{name}}! 👋\n\nWe have an exciting update for you.\n\n{{message}}\n\nThank you for staying connected with us!';
+function seed(){
+  const t=now();
+  const contacts=PEOPLE.map((p,i)=>({id:'c'+(i+1),name:p[0],phone:'+91900001'+String(1001+i),company:p[1],groups:p[2],consent:p[3],source:p[4],added:t-(40-i)*DAY}));
+  contacts.push({id:'c24',name:'Anita D.',phone:contacts[0].phone,company:'Das Fresh Mart',groups:['g1'],consent:'opted_in',source:'Imported list',added:t-3*DAY});
+  const ok=ids=>contacts.filter(c=>c.consent==='opted_in').map(c=>c.id).slice(0,ids);
+  const camp=(o)=>Object.assign({id:uid('k'),templateId:'',created:t,scheduledFor:null,sentAt:null,completedAt:null,errors:[],failedIds:[],note:'',attempts:0,source:'demo',draft:null},o);
+  const E1={code:'131026',msg:'Message undeliverable. The number may not be on WhatsApp.'};
+  const ids=n=>ok(n);
+  const campaigns=[
+    camp({name:'Diwali greetings',text:GENERAL,status:'Completed',created:t-18*DAY,sentAt:t-18*DAY+36e5,completedAt:t-18*DAY+37e5,recipientIds:ids(16),stats:{sent:15,delivered:14,read:10,failed:1},errors:[Object.assign({count:1},E1)],failedIds:['c5']}),
+    camp({name:'Winter price list',text:'Hi {{name}}, our winter price list is now available. Reply PRICES and we will send it across.',status:'Completed',created:t-11*DAY,sentAt:t-11*DAY+9e5,completedAt:t-11*DAY+95e4,recipientIds:ids(12),stats:{sent:12,delivered:11,read:6,failed:0}}),
+    camp({name:'Batch reminder: Students',text:'Hello {{name}}, your next session starts tomorrow at 10:00 AM. Reply STOP to opt out.',status:'Completed',created:t-7*DAY,sentAt:t-7*DAY+2e6,completedAt:t-7*DAY+21e5,recipientIds:contacts.filter(c=>c.groups.includes('g3')).map(c=>c.id),stats:{sent:6,delivered:6,read:5,failed:0}}),
+    camp({name:'New arrivals',text:'Hi {{name}}, new stock has arrived. {{message}}',status:'Completed',created:t-4*DAY,sentAt:t-4*DAY+5e6,completedAt:t-4*DAY+51e5,recipientIds:ids(20),stats:{sent:17,delivered:15,read:8,failed:3},errors:[Object.assign({count:2},E1),{code:'131049',msg:'Not delivered to protect the quality of the messaging ecosystem.',count:1}],failedIds:['c2','c9','c14']}),
+    camp({name:'Weekly special',text:'Hi {{name}}, this week\'s special is now live.',status:'Failed',created:t-2*DAY,sentAt:t-2*DAY+1e6,completedAt:t-2*DAY+11e5,recipientIds:ids(10),stats:{sent:0,delivered:0,read:0,failed:10},errors:[{code:'190',msg:'Access token expired. Generate a new system user token on the server.',count:10}],failedIds:ids(10)}),
+    camp({name:'Year-end offer',text:GENERAL,status:'Scheduled',created:t-DAY/2,scheduledFor:t+2*DAY,recipientIds:ids(14),stats:{sent:0,delivered:0,read:0,failed:0},draft:{groupIds:['g1'],contactIds:[],vars:{message:'Year-end prices apply until 31 December.'},media:null,templateId:'t1'}}),
+    camp({name:'Training enrolment open',text:'Hello {{name}}, enrolment for the next batch is open. Reply YES to reserve a seat.',status:'Draft',created:t-DAY,recipientIds:[],stats:{sent:0,delivered:0,read:0,failed:0},draft:{groupIds:['g3','g4'],contactIds:[],vars:{message:''},media:null,templateId:''}})
+  ];
+  return {
+    v:1,session:{signedIn:true},
+    user:{name:'Demo Admin',email:'admin@example.com',business:'Demo Business',role:'Owner'},
+    prefs:{theme:'system',cc:'+91',largeThreshold:20,rate:20},
+    groups:[
+      {id:'g1',name:'Customers',desc:'People who have bought from us.'},
+      {id:'g2',name:'Friends',desc:'Friends and family who asked to hear from us.'},
+      {id:'g3',name:'Students',desc:'Training batch enrolments.'},
+      {id:'g4',name:'Business Leads',desc:'Enquiries from the last 90 days.'}],
+    contacts,campaigns,
+    templates:[
+      {id:'t1',name:'General update',category:'Marketing',status:'approved',body:GENERAL},
+      {id:'t2',name:'Order ready',category:'Utility',status:'approved',body:'Hi {{name}}, your order is ready for pickup. Reply to this message if you would like delivery instead.'},
+      {id:'t3',name:'Session reminder',category:'Utility',status:'approved',body:'Hello {{name}}, a reminder that your session starts tomorrow at 10:00 AM. Reply STOP to opt out.'},
+      {id:'t4',name:'Seasonal offer for businesses',category:'Marketing',status:'pending',body:'Hello {{name}} from {{company}}! Our seasonal wholesale rates start this week. {{message}}'}],
+    inbound:[
+      {id:'i1',from:'c8',text:'STOP',ts:t-3*36e5,applied:false},
+      {id:'i2',from:'c5',text:'Yes please, reserve 2 kg for me.',ts:t-5*36e5,applied:false},
+      {id:'i3',from:'c11',text:'Thank you!',ts:t-DAY,applied:false}]
+  };
+}
+let S=load();
+function load(){
+  try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&Array.isArray(o.contacts)&&o.prefs){
+    o.campaigns.forEach(c=>{if(c.status==='Sending'){c.status='Failed';c.note='Interrupted when the page was closed. Use Retry failed to resend the remaining messages.';c.completedAt=now();}});return o;}}}catch(e){}
+  return seed();
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+const cont=id=>S.contacts.find(c=>c.id===id);
+const camp=id=>S.campaigns.find(c=>c.id===id);
+const gname=id=>{const g=S.groups.find(g=>g.id===id);return g?g.name:'Unknown group';};
+const CONSENT={opted_in:['Opted in','good'],pending:['Consent pending','warn'],opted_out:['Opted out','bad']};
+const STATUS={Draft:'',Scheduled:'info',Sending:'warn',Completed:'good',Failed:'bad'};
+const U={contacts:{q:'',g:'',c:''},hist:{q:'',s:'',from:'',to:''},pick:'',authMode:'in'};
+
+function normPhone(raw){
+  let s=String(raw==null?'':raw).trim();
+  if(!s)return{ok:false,error:'Enter a phone number.'};
+  s=s.replace(/[\s\-().]/g,'');
+  if(s.indexOf('00')===0)s='+'+s.slice(2);
+  if(s[0]!=='+'){
+    if(!/^\d+$/.test(s))return{ok:false,error:'Use digits only, with a country code such as +91.'};
+    const cc=S.prefs.cc,d=s.replace(/^0+/,'');
+    s=(d.indexOf(cc.slice(1))===0&&d.length>10)?'+'+d:cc+d;
+  }
+  if(!/^\+[1-9]\d{7,14}$/.test(s))return{ok:false,error:'That is not a valid number. Use a country code and 8 to 15 digits, for example +91 90000 11001.'};
+  if(s.indexOf('+91')===0&&!/^\+91[6-9]\d{9}$/.test(s))return{ok:false,error:'Indian mobile numbers have 10 digits and start with 6, 7, 8 or 9.'};
+  return{ok:true,e164:s};
+}
+const fmtPhone=n=>(n.indexOf('+91')===0&&n.length===13)?'+91 '+n.slice(3,8)+' '+n.slice(8):n;
+
+/* ---------- message helpers ---------- */
+const KNOWN=['name','company','message'];
+function fill(text,c,vars){
+  return String(text).replace(/\{\{\s*(\w+)\s*\}\}/g,(m,k)=>{
+    if(k==='name')return c?c.name.split(' ')[0]:'there';
+    if(k==='company')return c?(c.company||''):'';
+    if(k==='message')return (vars&&vars.message)||'';
+    return m;});
+}
+function waFormat(s){
+  let h=esc(s);
+  h=h.replace(/\*([^*\n]+)\*/g,'<b>$1</b>').replace(/_([^_\n]+)_/g,'<i>$1</i>').replace(/~([^~\n]+)~/g,'<s>$1</s>');
+  return h.replace(/\n/g,'<br>');
+}
+function usedKeys(t){const o=[];String(t).replace(/\{\{\s*(\w+)\s*\}\}/g,(m,k)=>{if(o.indexOf(k)<0)o.push(k);return m;});return o;}
+const TICKS='<svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="#53BDEB" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6l3 3 6-7"/><path d="M6 8l1 1 6-7"/></svg>';
+function previewHTML(text,c,vars,media){
+  const body=String(text).trim()?waFormat(fill(text,c,vars)):'<span style="opacity:.6">Your message appears here.</span>';
+  let m='';
+  if(media){
+    if(media.kind==='image'&&media.url)m='<img src="'+media.url+'" alt="Attached image preview">';
+    else m='<div class="fileblk">'+ic('file',22)+'<span>'+esc(media.name)+' · '+size(media.size)+'</span></div>';
+  }
+  const t=new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});
+  return '<div class="phone"><div class="phone-head"><span class="av">'+esc(initials(S.user.business))+'</span><div><b>'+esc(S.user.business)+'</b><small>Business account</small></div></div><div class="chat"><div class="bubble">'+m+'<div class="btext">'+body+'</div><div class="bmeta">'+t+' '+TICKS+'</div></div></div></div>';
+}
+
+/* ---------- ui primitives ---------- */
+function toast(msg,type){
+  const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;
+  $('#toasts').appendChild(el);setTimeout(()=>el.remove(),type==='bad'?6000:4000);
+}
+const mroot=$('#modal-root');let lastFocus=null,pending=null;
+function openModal(o){
+  lastFocus=document.activeElement;
+  mroot.innerHTML='<div class="scrim"><div class="modal'+(o.wide?' wide':'')+'" role="dialog" aria-modal="true" aria-labelledby="mtitle"><header><h2 id="mtitle">'+esc(o.title)+'</h2><button class="icon-btn" data-act="modal-close" aria-label="Close dialog">'+ic('x')+'</button></header><div class="mbody">'+o.body+'</div>'+(o.footer?'<footer>'+o.footer+'</footer>':'')+'</div></div>';
+  document.body.classList.add('lock');
+  const m=$('.modal',mroot);if(o.onMount)o.onMount(m);
+  const f=$('input:not([type=hidden]):not([type=file]),select,textarea',m)||$('.btn.primary',m);if(f&&!o.noFocus)f.focus();
+  return m;
+}
+function closeModal(val){
+  if(pending){const p=pending;pending=null;p(val===true);}
+  mroot.innerHTML='';document.body.classList.remove('lock');
+  if(lastFocus&&lastFocus.focus&&document.contains(lastFocus))lastFocus.focus();
+}
+function confirmDialog(o){
+  return new Promise(res=>{pending=res;openModal({title:o.title,body:'<div>'+o.body+'</div>',footer:'<button class="btn" data-act="modal-cancel">Cancel</button><button class="btn '+(o.danger?'danger':'primary')+'" data-act="modal-ok">'+esc(o.ok||'Confirm')+'</button>'});});
+}
+function copyText(text,btn){
+  const done=()=>{toast('Copied to clipboard','good');};
+  const fallback=()=>{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}ta.remove();ok?done():toast('Copy is blocked here. Select the text and copy it manually.','bad');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,fallback);}else fallback();
+}
+function applyTheme(){const r=document.documentElement;if(S.prefs.theme==='system')r.removeAttribute('data-theme');else r.setAttribute('data-theme',S.prefs.theme);}
+function pageHead(t,sub,actions){return '<div class="phead"><div><h1>'+esc(t)+'</h1>'+(sub?'<p>'+sub+'</p>':'')+'</div>'+(actions?'<div class="row">'+actions+'</div>':'')+'</div>';}
+const demoBar='<div class="demo" role="note"><b>Demo mode</b><span>Sample contacts and simulated results. Nothing is sent to WhatsApp.</span><a href="#api">Connect WhatsApp</a></div>';
+function pill(label,kind,live){return '<span class="pill '+(kind||'')+'">'+(live?'<span class="dot"></span>':'')+esc(label)+'</span>';}
+function statusPill(c){return pill(c.status,STATUS[c.status],c.status==='Sending');}
+
+/* ---------- recipients ---------- */
+function resolveRecipients(d){
+  const ids=new Set();
+  S.contacts.forEach(c=>{if(c.groups.some(g=>d.groupIds.indexOf(g)>=0)||d.contactIds.indexOf(c.id)>=0)ids.add(c.id);});
+  const seen=new Set(),sendable=[],excluded=[];
+  Array.from(ids).map(cont).filter(Boolean).forEach(c=>{
+    if(c.consent!=='opted_in'){excluded.push({c:c,reason:c.consent==='opted_out'?'Opted out':'Consent pending'});return;}
+    if(seen.has(c.phone)){excluded.push({c:c,reason:'Duplicate number'});return;}
+    seen.add(c.phone);sendable.push(c);
+  });
+  return{sendable,excluded};
+}
+function fingerprint(text,phones){const s=String(text).trim()+'|'+phones.slice().sort().join(',');let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return String(h);}
+
+/* ---------- composer state ---------- */
+function newDraft(){return{id:null,name:'',text:GENERAL,templateId:'t1',vars:{message:'Fresh stock arrives this Saturday. Reply YES to reserve yours.'},groupIds:[],contactIds:[],when:'now',at:toLocalInput(now()+DAY),media:null,step:1,permission:false,allowDupe:false,launching:false,runId:null};}
+let D=newDraft();
+
+/* ---------- views ---------- */
+const NAV=[['dashboard','Dashboard','home'],['contacts','Contacts','users'],['groups','Contact groups','folder'],['broadcast','Create broadcast','send'],['templates','Message templates','file'],['scheduled','Scheduled campaigns','clock'],['history','Campaign history','bar'],['api','Connect WhatsApp','link'],['profile','Profile & preferences','user']];
+const ROUTES=NAV.map(n=>n[0]);
+const route=()=>{const h=location.hash.slice(1);return ROUTES.indexOf(h)>=0?h:'dashboard';};
+
+function shell(r,inner){
+  const side=NAV.map(n=>'<a href="#'+n[0]+'"'+(n[0]===r?' aria-current="page"':'')+'>'+ic(n[2])+n[1]+'</a>').join('');
+  const b=(k,l,i)=>'<a href="#'+k+'"'+(k===r?' aria-current="page"':'')+'>'+ic(i,22)+'<span>'+l+'</span></a>';
+  return '<div class="shell"><aside class="side" aria-label="Sidebar"><a class="brand" href="#dashboard"><span class="mark">'+ic('send',20)+'</span><span><small>WhatsApp</small><b>Broadcast Manager</b></span></a><nav aria-label="Main">'+side+'</nav><div class="side-foot"><div class="who"><span class="av">'+esc(initials(S.user.name))+'</span><div style="min-width:0"><b>'+esc(S.user.name)+'</b><small>'+esc(S.user.role)+' · '+esc(S.user.business)+'</small></div></div><div class="row"><button class="btn sm" data-act="theme">'+ic('moon',16)+' Theme</button><button class="btn sm" data-act="signout">'+ic('logout',16)+' Sign out</button></div></div></aside>'
+   +'<main id="main" tabindex="-1"><div class="mobhead"><a class="brand" href="#dashboard"><span class="mark">'+ic('send',20)+'</span><span><small>WhatsApp</small><b>Broadcast Manager</b></span></a><button class="icon-btn" data-act="theme" aria-label="Switch theme">'+ic('moon')+'</button></div>'+demoBanner()+inner+'</main></div>'
+   +'<nav class="bottom" aria-label="Primary">'+b('dashboard','Home','home')+b('contacts','Contacts','users')
+   +'<a class="fab" href="#broadcast"'+(r==='broadcast'?' aria-current="page"':'')+' aria-label="Create broadcast"><span class="disc">'+ic('send',24)+'</span><span>Broadcast</span></a>'
+   +b('history','Campaigns','bar')+'<button data-act="more" aria-haspopup="dialog">'+ic('grid',22)+'<span>More</span></button></nav>';
+}
+
+/* auth */
+function authView(){
+  const up=U.authMode==='up';
+  return '<div class="auth"><div class="card auth-card"><div class="auth-hero"><span class="mark">'+ic('send',22)+'</span><h1>'+(up?'Create your account':'Welcome back')+'</h1><p class="muted">Send personalised WhatsApp broadcasts to people who asked to hear from you.</p></div>'
+  +'<div class="seg" role="tablist" aria-label="Sign in or register"><button role="tab" aria-selected="'+(!up)+'" data-act="auth-mode" data-mode="in">Sign in</button><button role="tab" aria-selected="'+up+'" data-act="auth-mode" data-mode="up">Create account</button></div>'
+  +'<form id="auth-form" class="stack" novalidate>'
+  +(up?'<div class="field"><label for="a-name">Your name</label><input class="in" id="a-name" autocomplete="name"></div><div class="field"><label for="a-biz">Business name</label><input class="in" id="a-biz" autocomplete="organization"></div>':'')
+  +'<div class="field"><label for="a-email">Email</label><input class="in" id="a-email" type="email" autocomplete="email" inputmode="email"></div>'
+  +'<div class="field"><label for="a-pass">Password</label><input class="in" id="a-pass" type="password" autocomplete="'+(up?'new-password':'current-password')+'"><span class="hint">At least 8 characters.</span></div>'
+  +(up?'<div class="field"><label for="a-pass2">Confirm password</label><input class="in" id="a-pass2" type="password" autocomplete="new-password"></div>':'')
+  +'<p class="err" id="a-err" role="alert"></p><button class="btn primary lg" type="submit">'+(up?'Create account':'Sign in')+'</button></form>'
+  +'<button class="btn" data-act="demo-enter">Explore demo mode</button>'
+  +'<p class="hint">Demo sign-in accepts any email and a password of 8 or more characters. Real accounts use server-side authentication with role-based access.</p></div></div>';
+}
+
+/* dashboard */
+function aggregate(list){return list.reduce((a,c)=>{const s=c.stats||{};a.rec+=c.recipientIds.length;a.sent+=s.sent||0;a.delivered+=s.delivered||0;a.read+=s.read||0;a.failed+=s.failed||0;return a;},{rec:0,sent:0,delivered:0,read:0,failed:0});}
+function sbar(a){
+  const tot=(a.sent+a.failed)||1;
+  const seg=[['read',a.read,'--seg-read'],['delivered, unread',a.delivered-a.read,'--seg-delivered'],['sent, not delivered',a.sent-a.delivered,'--seg-sent'],['failed',a.failed,'--seg-failed']];
+  return '<div class="sbar" role="img" aria-label="'+seg.map(s=>s[1]+' '+s[0]).join(', ')+'">'+seg.map(s=>'<i style="width:'+(s[1]/tot*100).toFixed(2)+'%;background:var('+s[2]+')" title="'+s[1]+' '+s[0]+'"></i>').join('')+'</div>';
+}
+function legend(a){
+  return '<div class="legend"><span><i style="background:var(--seg-read)"></i><b>'+nf(a.read)+'</b> read</span><span><i style="background:var(--seg-delivered)"></i><b>'+nf(a.delivered-a.read)+'</b> delivered</span><span><i style="background:var(--seg-sent)"></i><b>'+nf(a.sent-a.delivered)+'</b> sent only</span><span><i style="background:var(--seg-failed)"></i><b>'+nf(a.failed)+'</b> failed</span></div>';
+}
+function sentCampaigns(){return S.campaigns.filter(c=>['Completed','Failed','Sending'].indexOf(c.status)>=0);}
+function dashboard(){
+  const hr=new Date().getHours(),hello=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
+  const can=S.contacts.filter(c=>c.consent==='opted_in').length;
+  const a=aggregate(sentCampaigns());
+  const recent=S.campaigns.slice().sort((x,y)=>(y.sentAt||y.created)-(x.sentAt||x.created)).slice(0,5);
+  const next=S.campaigns.filter(c=>c.status==='Scheduled').sort((x,y)=>x.scheduledFor-y.scheduledFor)[0];
+  const failPct=a.rec?Math.round(a.failed/(a.sent+a.failed||1)*100):0;
+  const html=pageHead(hello+', '+S.user.name.split(' ')[0],'Here is where your broadcasts stand.')
+  +quickStart()+'<section class="cta" aria-label="Create a broadcast"><div><h2>Ready to send an update?</h2><p>Write a message, pick who gets it, and review before anything goes out.</p></div><a class="btn lg" href="#broadcast">'+ic('plus')+' Create Broadcast</a></section>'
+  +'<section class="stats" aria-label="Totals"><div class="stat"><small>Total contacts</small><b>'+nf(S.contacts.length)+'</b><span>'+nf(can)+' can receive messages</span></div>'
+  +'<div class="stat"><small>Contact groups</small><b>'+nf(S.groups.length)+'</b><span>'+nf(S.contacts.filter(c=>!c.groups.length).length)+' contacts ungrouped</span></div>'
+  +'<div class="stat"><small>Campaigns created</small><b>'+nf(S.campaigns.length)+'</b><span>'+nf(S.campaigns.filter(c=>c.status==='Scheduled').length)+' scheduled</span></div>'
+  +'<div class="stat"><small>Messages sent</small><b>'+nf(a.sent)+'</b><span>accepted by the API</span></div></section>'
+  +'<section class="card"><div class="card-h"><h2>Delivery results</h2>'+(WA().mode==='demo'?pill('Simulated demo data','warn'):'')+'</div>'
+  +(a.sent+a.failed?sbar(a)+'<div style="height:10px"></div>'+legend(a)+'<p class="small muted" style="margin-top:10px">'+failPct+'% of messages failed. Read counts only include people who have read receipts turned on. With a live API connection these numbers come from WhatsApp status updates.</p>':'<div class="empty"><b>No delivery data yet</b>Send a campaign to see results here.</div>')+'</section>'
+  +(next?'<section class="callout info row between"><span><b>Next scheduled:</b> '+esc(next.name)+', '+fmt(next.scheduledFor)+' ('+rel(next.scheduledFor)+')</span><a class="btn sm" href="#scheduled">View</a></section>':'')
+  +'<section class="card flush"><div class="card-h"><h2>Recent campaigns</h2><a class="btn sm" href="#history">All campaigns</a></div><ul class="list">'
+  +(recent.length?recent.map(c=>{const s=c.stats||{sent:0,delivered:0,read:0,failed:0};
+    return '<li class="crow" style="grid-template-areas:\'main main\' \'meta meta\';grid-template-columns:minmax(0,1fr) auto"><div class="main" style="grid-area:main"><b>'+esc(c.name)+'</b><span>'+fmt(c.sentAt||c.scheduledFor||c.created)+' · '+nf(c.recipientIds.length||(c.draft?resolveRecipients(c.draft).sendable.length:0))+' recipients</span></div><div class="meta" style="grid-area:meta">'+statusPill(c)+(['Completed','Failed','Sending'].indexOf(c.status)>=0?'<div style="flex:1;min-width:120px">'+sbar(s)+'</div><span class="small muted num">'+nf(s.sent)+' sent · '+nf(s.failed)+' failed</span>':'')+'</div></li>';}).join(''):'<li class="empty"><b>No campaigns yet</b>Create your first broadcast to get started.</li>')
+  +'</ul></section>';
+  return{html};
+}
+
+/* contacts */
+function filteredContacts(){
+  const f=U.contacts,q=f.q.trim().toLowerCase();
+  return S.contacts.filter(c=>(!q||c.name.toLowerCase().indexOf(q)>=0||c.phone.indexOf(q.replace(/[\s-]/g,''))>=0||(c.company||'').toLowerCase().indexOf(q)>=0)&&(!f.g||c.groups.indexOf(f.g)>=0)&&(!f.c||c.consent===f.c));
+}
+function contactRows(){
+  const l=filteredContacts();
+  if(!l.length)return '<li class="empty"><b>No contacts match</b>Try a different search or clear the filters.</li>';
+  return l.map(c=>{const k=CONSENT[c.consent];
+   return '<li class="crow"><span class="av" aria-hidden="true">'+esc(initials(c.name))+'</span><div class="main"><b>'+esc(c.name)+'</b><span class="num">'+esc(fmtPhone(c.phone))+(c.company?' · '+esc(c.company):'')+'</span></div><div class="meta">'+pill(k[0],k[1])+c.groups.map(g=>'<span class="chip">'+esc(gname(g))+'</span>').join('')+'</div><div class="acts"><button class="icon-btn" data-act="edit-contact" data-id="'+c.id+'" aria-label="Edit '+esc(c.name)+'">'+ic('edit',18)+'</button><button class="icon-btn bad" data-act="del-contact" data-id="'+c.id+'" aria-label="Delete '+esc(c.name)+'">'+ic('trash',18)+'</button></div></li>';}).join('');
+}
+function dupeGroups(){const m={};S.contacts.forEach(c=>{(m[c.phone]=m[c.phone]||[]).push(c);});return Object.keys(m).filter(k=>m[k].length>1).map(k=>m[k]);}
+function contacts(){
+  const f=U.contacts,dn=sum(dupeGroups(),g=>g.length-1);
+  const html=pageHead('Contacts','Everyone you can message, with consent recorded for each person.','<button class="btn" data-act="import">'+ic('upload',18)+' Import</button><button class="btn primary" data-act="add-contact">'+ic('plus',18)+' Add contact</button>')
+  +'<section class="card flush"><div class="card-h"><h2>All contacts</h2><div class="row"><span class="small muted" id="c-count"></span><button class="btn sm" data-act="dedupe" id="dedupe-btn"'+(dn?'':' disabled')+'>'+ic('copy',16)+' Remove duplicates'+(dn?' ('+dn+')':'')+'</button></div></div>'
+  +'<div class="toolbar"><div class="wide field"><label class="lbl" for="f-q" style="position:absolute;left:-9999px">Search</label><input class="in" id="f-q" type="search" placeholder="Search name, number or company" value="'+esc(f.q)+'"></div>'
+  +'<div class="field"><label class="lbl" for="f-g" style="position:absolute;left:-9999px">Group</label><select class="in" id="f-g"><option value="">All groups</option>'+S.groups.map(g=>'<option value="'+g.id+'"'+(f.g===g.id?' selected':'')+'>'+esc(g.name)+'</option>').join('')+'</select></div>'
+  +'<div class="field"><label class="lbl" for="f-c" style="position:absolute;left:-9999px">Consent</label><select class="in" id="f-c"><option value="">Any consent status</option><option value="opted_in"'+(f.c==='opted_in'?' selected':'')+'>Opted in</option><option value="pending"'+(f.c==='pending'?' selected':'')+'>Consent pending</option><option value="opted_out"'+(f.c==='opted_out'?' selected':'')+'>Opted out</option></select></div></div>'
+  +'<ul class="list" id="c-list">'+contactRows()+'</ul></section>';
+  return{html,mount(){
+    const up=()=>{$('#c-list').innerHTML=contactRows();$('#c-count').textContent=filteredContacts().length+' of '+S.contacts.length;};up();
+    $('#f-q').addEventListener('input',e=>{U.contacts.q=e.target.value;up();});
+    $('#f-g').addEventListener('change',e=>{U.contacts.g=e.target.value;up();});
+    $('#f-c').addEventListener('change',e=>{U.contacts.c=e.target.value;up();});
+  }};
+}
+function contactModal(id){
+  const c=id?cont(id):null;
+  const m=openModal({title:c?'Edit contact':'Add contact',body:
+   '<form id="contact-form" class="stack" novalidate data-id="'+(c?c.id:'')+'"><div class="formgrid"><div class="field"><label for="f-name">Name</label><input class="in" id="f-name" value="'+esc(c?c.name:'')+'" autocomplete="off"></div>'
+   +'<div class="field"><label for="f-phone">WhatsApp number</label><input class="in" id="f-phone" type="tel" inputmode="tel" value="'+esc(c?fmtPhone(c.phone):'')+'" placeholder="'+esc(S.prefs.cc)+' 90000 11001"><span class="hint">Numbers without a country code use '+esc(S.prefs.cc)+'.</span></div></div>'
+   +'<div class="field"><label for="f-company">Company (optional)</label><input class="in" id="f-company" value="'+esc(c?c.company:'')+'" autocomplete="off"></div>'
+   +'<fieldset style="border:0;padding:0;margin:0"><legend class="lbl">Groups</legend>'+S.groups.map(g=>'<label class="check"><input type="checkbox" name="grp" value="'+g.id+'"'+(c&&c.groups.indexOf(g.id)>=0?' checked':'')+'><span>'+esc(g.name)+'</span></label>').join('')+'</fieldset>'
+   +'<div class="formgrid"><div class="field"><label for="f-consent">Consent status</label><select class="in" id="f-consent"><option value="pending"'+(!c||c.consent==='pending'?' selected':'')+'>Consent pending</option><option value="opted_in"'+(c&&c.consent==='opted_in'?' selected':'')+'>Opted in</option><option value="opted_out"'+(c&&c.consent==='opted_out'?' selected':'')+'>Opted out</option></select></div>'
+   +'<div class="field"><label for="f-source">How consent was given</label><select class="in" id="f-source">'+['WhatsApp opt-in','Website form','In-store form','Imported list','Other'].map(s=>'<option'+(c&&c.source===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div></div>'
+   +'<p class="err" id="f-err" role="alert"></p></form>',
+   footer:'<button class="btn" data-act="modal-close">Cancel</button><button class="btn primary" type="submit" form="contact-form">'+(c?'Save changes':'Add contact')+'</button>'});
+}
+function submitContact(form){
+  const id=form.dataset.id,name=$('#f-name').value.trim(),err=$('#f-err');
+  if(!name){err.textContent='Enter the contact\'s name.';$('#f-name').focus();return;}
+  const p=normPhone($('#f-phone').value);if(!p.ok){err.textContent=p.error;$('#f-phone').focus();return;}
+  const dup=S.contacts.find(c=>c.phone===p.e164&&c.id!==id);
+  if(dup){err.textContent='This number already belongs to '+dup.name+'.';return;}
+  const data={name:name,phone:p.e164,company:$('#f-company').value.trim(),groups:$$('input[name=grp]:checked',form).map(i=>i.value),consent:$('#f-consent').value,source:$('#f-source').value};
+  if(id)Object.assign(cont(id),data);else S.contacts.unshift(Object.assign({id:uid('c'),added:now()},data));
+  save();closeModal();toast(id?'Contact updated':'Contact added','good');render();
+}
+
+/* import */
+function parseCSV(text){
+  const rows=[];let row=[],cell='',q=false;text=text.replace(/^﻿/,'');
+  const delim=(text.split('\n')[0].match(/\t/g)||[]).length>(text.split('\n')[0].match(/,/g)||[]).length?'\t':',';
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}
+    else if(ch==='"')q=true;
+    else if(ch===delim){row.push(cell);cell='';}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cell);cell='';if(row.some(x=>String(x).trim()!==''))rows.push(row);row=[];}
+    else cell+=ch;
+  }
+  row.push(cell);if(row.some(x=>String(x).trim()!==''))rows.push(row);return rows;
+}
+function loadXLSX(){
+  if(window.XLSX)return Promise.resolve();
+  return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=()=>rej(new Error('Excel support did not load. Save the sheet as CSV and import that instead.'));document.head.appendChild(s);});
+}
+function readRows(file){
+  return new Promise((res,rej)=>{
+    const ext=file.name.split('.').pop().toLowerCase(),fr=new FileReader();
+    fr.onerror=()=>rej(new Error('That file could not be read.'));
+    if(['csv','tsv','txt'].indexOf(ext)>=0){fr.onload=()=>res(parseCSV(String(fr.result)));fr.readAsText(file);}
+    else if(['xlsx','xls'].indexOf(ext)>=0){
+      loadXLSX().then(()=>{fr.onload=()=>{try{const wb=XLSX.read(fr.result,{type:'array'});res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''}));}catch(e){rej(new Error('That workbook could not be read.'));}};fr.readAsArrayBuffer(file);},rej);
+    }else rej(new Error('Choose a .csv, .xlsx or .xls file.'));
+  });
+}
+function analyze(rows){
+  if(!rows.length)return{valid:[],invalid:[],dupes:0,hasGroup:false};
+  const h=rows[0].map(x=>String(x).toLowerCase());
+  const hasHead=h.some(x=>/name|phone|mobile|whatsapp|number/.test(x));
+  const find=re=>h.findIndex(x=>re.test(x));
+  let iN=0,iP=1,iC=2,iG=3;
+  if(hasHead){iN=find(/name/);iP=find(/phone|mobile|whatsapp|number|contact no/);iC=find(/company|business|organi/);iG=find(/group|tag|segment/);if(iN<0)iN=0;if(iP<0)iP=1;}
+  const body=hasHead?rows.slice(1):rows;
+  const seen=new Set(S.contacts.map(c=>c.phone)),valid=[],invalid=[];let dupes=0;
+  body.forEach((r,i)=>{
+    const name=String(r[iN]||'').trim(),p=normPhone(r[iP]);
+    if(!name){invalid.push('Row '+(i+(hasHead?2:1))+': name is missing');return;}
+    if(!p.ok){invalid.push('Row '+(i+(hasHead?2:1))+' ('+name+'): '+p.error);return;}
+    if(seen.has(p.e164)){dupes++;return;}
+    seen.add(p.e164);valid.push({name:name,phone:p.e164,company:iC>=0?String(r[iC]||'').trim():'',group:iG>=0?String(r[iG]||'').trim():''});
+  });
+  return{valid,invalid,dupes,hasGroup:iG>=0&&valid.some(v=>v.group)};
+}
+function importModal(){
+  let parsed=null;
+  openModal({title:'Import contacts',wide:true,body:
+   '<div class="field"><label for="imp-file">CSV or Excel file</label><input class="in" id="imp-file" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls"><span class="hint">Columns: name, phone, company (optional), group (optional). The first row can be a header.</span></div><div id="imp-out"></div>',
+   footer:'<button class="btn" data-act="modal-close">Cancel</button><button class="btn primary" id="imp-go" disabled>Import contacts</button>',
+   onMount(m){
+     const out=$('#imp-out',m),go=$('#imp-go',m);
+     $('#imp-file',m).addEventListener('change',e=>{
+       const f=e.target.files[0];if(!f)return;go.disabled=true;out.innerHTML='<p class="muted">Reading file…</p>';
+       readRows(f).then(rows=>{
+         parsed=analyze(rows);
+         out.innerHTML='<div class="stack"><div class="callout '+(parsed.valid.length?'good':'bad')+'"><b>'+parsed.valid.length+' ready to import</b> · '+parsed.dupes+' already in your list or repeated in the file (skipped) · '+parsed.invalid.length+' with problems</div>'
+          +(parsed.invalid.length?'<details><summary class="small">See problems</summary><ul class="small">'+parsed.invalid.slice(0,8).map(x=>'<li>'+esc(x)+'</li>').join('')+(parsed.invalid.length>8?'<li>and '+(parsed.invalid.length-8)+' more</li>':'')+'</ul></details>':'')
+          +'<div class="field"><label for="imp-grp">Add to group</label><select class="in" id="imp-grp"><option value="">No group</option>'+S.groups.map(g=>'<option value="'+g.id+'">'+esc(g.name)+'</option>').join('')+'</select>'+(parsed.hasGroup?'<span class="hint">Groups named in the file are matched or created too.</span>':'')+'</div>'
+          +'<fieldset style="border:0;padding:0;margin:0"><legend class="lbl">Consent for these contacts</legend><label class="check"><input type="radio" name="imp-consent" value="pending" checked><span>Consent pending<small>Recommended. You will confirm permission before sending to them.</small></span></label>'
+          +'<label class="check"><input type="radio" name="imp-consent" value="opted_in"><span>I confirm these people agreed to receive WhatsApp messages from me<small>They will be marked as opted in.</small></span></label></fieldset></div>';
+         go.disabled=!parsed.valid.length;
+       }).catch(err=>{parsed=null;out.innerHTML='<div class="callout bad">'+esc(err.message)+'</div>';});
+     });
+     go.addEventListener('click',()=>{
+       if(!parsed||!parsed.valid.length)return;
+       const gsel=$('#imp-grp',m).value,consent=$('input[name=imp-consent]:checked',m).value;let created=0;
+       parsed.valid.forEach(v=>{
+         const gs=[];if(gsel)gs.push(gsel);
+         if(v.group){let g=S.groups.find(x=>x.name.toLowerCase()===v.group.toLowerCase());if(!g){g={id:uid('g'),name:v.group,desc:''};S.groups.push(g);}if(gs.indexOf(g.id)<0)gs.push(g.id);}
+         S.contacts.push({id:uid('c'),name:v.name,phone:v.phone,company:v.company,groups:gs,consent:consent,source:'Imported list',added:now()});created++;
+       });
+       save();closeModal();toast(created+' contacts imported','good');render();
+     });
+   }});
+}
+async function dedupe(){
+  const gs=dupeGroups();if(!gs.length)return;
+  const n=sum(gs,g=>g.length-1);
+  const ok=await confirmDialog({title:'Remove duplicate numbers?',body:'<p>'+n+' duplicate contact'+(n===1?'':'s')+' will be merged into the earliest entry for each number. Their groups are combined. If any copy has opted out, the merged contact stays opted out.</p>',ok:'Remove duplicates'});
+  if(!ok)return;
+  const drop=new Set();
+  gs.forEach(g=>{
+    g.sort((a,b)=>(a.added||0)-(b.added||0));const keep=g[0];
+    g.slice(1).forEach(d=>{d.groups.forEach(x=>{if(keep.groups.indexOf(x)<0)keep.groups.push(x);});if(d.consent==='opted_out')keep.consent='opted_out';else if(d.consent==='pending'&&keep.consent==='opted_in')keep.consent='pending';drop.add(d.id);});
+  });
+  S.contacts=S.contacts.filter(c=>!drop.has(c.id));save();toast(n+' duplicate'+(n===1?'':'s')+' removed','good');render();
+}
+
+/* groups */
+function groups(){
+  const html=pageHead('Contact groups','Organise people so each broadcast reaches the right audience.','<button class="btn primary" data-act="add-group">'+ic('plus',18)+' New group</button>')
+  +'<section class="cards">'+(S.groups.length?S.groups.map(g=>{const m=S.contacts.filter(c=>c.groups.indexOf(g.id)>=0),ok=m.filter(c=>c.consent==='opted_in').length;
+    return '<article class="card"><div class="row between"><h2>'+esc(g.name)+'</h2><div class="row" style="gap:0"><button class="icon-btn" data-act="edit-group" data-id="'+g.id+'" aria-label="Edit group '+esc(g.name)+'">'+ic('edit',18)+'</button><button class="icon-btn bad" data-act="del-group" data-id="'+g.id+'" aria-label="Delete group '+esc(g.name)+'">'+ic('trash',18)+'</button></div></div><p class="muted small">'+esc(g.desc||'No description.')+'</p><div class="row"><span class="pill">'+m.length+' contacts</span>'+pill(ok+' can receive','good')+(m.length-ok?pill((m.length-ok)+' excluded','warn'):'')+'</div><div class="row"><button class="btn sm" data-act="view-group" data-id="'+g.id+'">View contacts</button><button class="btn sm primary" data-act="broadcast-group" data-id="'+g.id+'">Broadcast to group</button></div></article>';}).join(''):'<div class="card empty"><b>No groups yet</b>Create a group such as Customers or Students.</div>')+'</section>';
+  return{html};
+}
+function groupModal(id){
+  const g=id?S.groups.find(x=>x.id===id):null;
+  openModal({title:g?'Edit group':'New group',body:'<form id="group-form" class="stack" novalidate data-id="'+(g?g.id:'')+'"><div class="field"><label for="g-name">Group name</label><input class="in" id="g-name" value="'+esc(g?g.name:'')+'" placeholder="e.g. Wholesale buyers" maxlength="40"></div><div class="field"><label for="g-desc">Description (optional)</label><input class="in" id="g-desc" value="'+esc(g?g.desc:'')+'" maxlength="120"></div><p class="err" id="g-err" role="alert"></p></form>',footer:'<button class="btn" data-act="modal-close">Cancel</button><button class="btn primary" type="submit" form="group-form">'+(g?'Save group':'Create group')+'</button>'});
+}
+
+/* templates */
+function templates(){
+  const html=pageHead('Message templates','Business-initiated messages on WhatsApp must use templates that Meta has approved.','<button class="btn primary" data-act="tmpl-new">'+ic('plus',18)+' New template</button>')
+  +'<section class="cards">'+S.templates.map(t=>{const k=t.status==='approved'?['Approved','good']:t.status==='rejected'?['Rejected','bad']:['Pending approval','warn'];
+   return '<article class="card"><div class="row between"><h2>'+esc(t.name)+'</h2><div class="row" style="gap:0"><button class="icon-btn" data-act="tmpl-edit" data-id="'+t.id+'" aria-label="Edit template '+esc(t.name)+'">'+ic('edit',18)+'</button><button class="icon-btn bad" data-act="tmpl-del" data-id="'+t.id+'" aria-label="Delete template '+esc(t.name)+'">'+ic('trash',18)+'</button></div></div><div class="row">'+pill(k[0],k[1])+'<span class="chip">'+esc(t.category)+'</span></div><p class="tbody">'+esc(t.body)+'</p><div class="row">'+(t.status==='approved'?'<button class="btn sm primary" data-act="tmpl-use" data-id="'+t.id+'">Use in broadcast</button>':t.status==='pending'?'<button class="btn sm" data-act="tmpl-approve" data-id="'+t.id+'">Simulate approval</button>':'')+'</div></article>';}).join('')+'</section>'
+  +'<p class="small muted">In demo mode you can simulate approval. With a live account, status comes from Meta after you submit the template through the API.</p>';
+  return{html};
+}
+function templateModal(id){
+  const t=id?S.templates.find(x=>x.id===id):null;
+  openModal({title:t?'Edit template':'New template',wide:true,body:'<form id="tmpl-form" class="stack" novalidate data-id="'+(t?t.id:'')+'"><div class="formgrid"><div class="field"><label for="t-name">Template name</label><input class="in" id="t-name" value="'+esc(t?t.name:'')+'" maxlength="60"></div><div class="field"><label for="t-cat">Category</label><select class="in" id="t-cat"><option'+(t&&t.category==='Marketing'?' selected':'')+'>Marketing</option><option'+(t&&t.category==='Utility'?' selected':'')+'>Utility</option></select></div></div><div class="field"><label for="t-body">Message body</label><textarea class="in" id="t-body" maxlength="1024" style="min-height:160px">'+esc(t?t.body:'')+'</textarea><span class="hint">Use {{name}}, {{company}} and {{message}}. Up to 1,024 characters. Saving an approved template sends it for review again.</span></div><p class="err" id="t-err" role="alert"></p></form>',footer:'<button class="btn" data-act="modal-close">Cancel</button><button class="btn primary" type="submit" form="tmpl-form">'+(t?'Save template':'Save as pending')+'</button>'});
+}
+
+/* composer */
+const EMOJI=['👋','😊','🙏','🎉','🌟','✅','📢','🎁','🛒','📦','⏰','📅','❤️','👍','🔥','💬'];
+const MAXLEN=1024;
+function validateMedia(f){
+  const ext=f.name.split('.').pop().toLowerCase();
+  if(f.type.indexOf('image/')===0){if(['image/jpeg','image/png'].indexOf(f.type)<0)return{error:'WhatsApp accepts JPEG and PNG images.'};if(f.size>5*1048576)return{error:'Images can be up to 5 MB. This one is '+size(f.size)+'.'};return{kind:'image'};}
+  if(f.type.indexOf('video/')===0){if(['video/mp4','video/3gpp'].indexOf(f.type)<0)return{error:'WhatsApp accepts MP4 and 3GPP videos.'};if(f.size>16*1048576)return{error:'Videos can be up to 16 MB. This one is '+size(f.size)+'.'};return{kind:'video'};}
+  if(['pdf','doc','docx','xls','xlsx','ppt','pptx','txt'].indexOf(ext)>=0){if(f.size>100*1048576)return{error:'Documents can be up to 100 MB.'};return{kind:'document'};}
+  return{error:'This file type is not supported. Use JPEG, PNG, MP4, 3GPP, PDF, Office files or TXT.'};
+}
+function stepper(){
+  const L=['Message','Recipients','Review & send'];
+  return '<nav class="steps" aria-label="Broadcast steps">'+L.map((l,i)=>'<button data-act="step" data-to="'+(i+1)+'"'+(D.step===i+1?' aria-current="step"':'')+(D.step>i+1?' class="done"':'')+'><i>'+(D.step>i+1?ic('check',14):(i+1))+'</i>'+l+'</button>').join('')+'</nav>';
+}
+function step1(){
+  const tpls=S.templates.filter(t=>t.status==='approved');
+  return '<div class="compose"><section class="card stack">'
+  +'<div class="field"><label for="c-name">Campaign name</label><input class="in" id="c-name" maxlength="80" autocomplete="off" placeholder="e.g. Saturday stock update" value="'+esc(D.name)+'"></div>'
+  +'<div class="field"><label for="c-tpl">Start from a template</label><select class="in" id="c-tpl"><option value="">Custom message (needs approval before live sending)</option>'+tpls.map(t=>'<option value="'+t.id+'"'+(D.templateId===t.id?' selected':'')+'>'+esc(t.name)+'</option>').join('')+'</select></div>'
+  +'<div class="field"><label for="msg">Message</label><div class="tools"><button type="button" class="btn sm" data-act="emoji-toggle" aria-expanded="false" aria-controls="emoji-panel">'+ic('smile',16)+' Emoji</button><button type="button" class="btn sm" data-ph="{{name}}">{{name}}</button><button type="button" class="btn sm" data-ph="{{company}}">{{company}}</button><button type="button" class="btn sm" data-ph="{{message}}">{{message}}</button><button type="button" class="btn sm" data-act="attach">'+ic('clip',16)+' Attach</button><input id="c-file" type="file" hidden accept="image/jpeg,image/png,video/mp4,video/3gpp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"></div>'
+  +'<div class="emojis" id="emoji-panel" hidden>'+EMOJI.map(e=>'<button type="button" data-emoji="'+e+'" aria-label="Insert '+e+'">'+e+'</button>').join('')+'</div>'
+  +'<textarea class="in" id="msg" spellcheck="true">'+esc(D.text)+'</textarea><div class="row between"><span class="small" id="warns"></span><span class="small muted num" id="counter"></span></div><span class="hint">Format with *bold*, _italic_ and ~strike~, as in WhatsApp.</span></div>'
+  +'<div class="field"><label for="c-var">Value for {{message}}</label><input class="in" id="c-var" maxlength="300" value="'+esc(D.vars.message)+'" placeholder="The part of the message that changes each time"></div>'
+  +'<div id="media-box"></div>'
+  +'<div class="field"><label for="c-test">Send a test message</label><div class="row" style="flex-wrap:nowrap"><input class="in" id="c-test" type="tel" inputmode="tel" placeholder="'+esc(S.prefs.cc)+' 90000 11001"><button type="button" class="btn" data-act="test">Send test</button></div><span class="hint">Goes to one number only. In demo mode nothing is sent.</span></div>'
+  +'<div class="row end"><button class="btn primary" data-act="step" data-to="2">Next: Recipients</button></div></section>'
+  +'<aside class="stack"><h2>Live preview</h2><div id="preview"></div><p class="small muted" id="prev-for"></p></aside></div>';
+}
+function step2(){
+  return '<section class="card stack"><div class="stack"><h2>Groups</h2><div class="gpick">'+S.groups.map(g=>{const m=S.contacts.filter(c=>c.groups.indexOf(g.id)>=0),ok=m.filter(c=>c.consent==='opted_in').length;
+    return '<label class="gchk"><input type="checkbox" data-grp="'+g.id+'"'+(D.groupIds.indexOf(g.id)>=0?' checked':'')+'><span><b>'+esc(g.name)+'</b><small>'+ok+' can receive · '+m.length+' contacts</small></span></label>';}).join('')+'</div></div>'
+  +'<div class="stack"><h2>Individual recipients</h2><input class="in" id="p-q" type="search" placeholder="Search contacts" aria-label="Search contacts" value="'+esc(U.pick)+'"><ul class="plist" id="p-list"></ul></div></section>'
+  +'<section class="card stack" id="recip"></section>'
+  +'<div class="row between"><button class="btn" data-act="step" data-to="1">Back</button><button class="btn primary" id="next2" data-act="step" data-to="3">Next: Review</button></div>';
+}
+function step3(){
+  const r=resolveRecipients(D),n=r.sendable.length;
+  const dupe=findDupe(r.sendable);
+  const eta=Math.max(1,Math.ceil(n/S.prefs.rate));
+  const sample=r.sendable[0]||null;
+  const later=D.when==='later';
+  return '<div class="compose"><div class="stack"><section class="card stack"><h2>When to send</h2><div class="seg" role="group" aria-label="Send time"><button data-act="when" data-v="now" aria-selected="'+(!later)+'">Send now</button><button data-act="when" data-v="later" aria-selected="'+later+'">Schedule for later</button></div>'
+  +'<div class="field" id="sched-box"'+(later?'':' hidden')+'><label for="c-at">Date and time</label><input class="in" id="c-at" type="datetime-local" min="'+toLocalInput(now()+5*6e4)+'" value="'+esc(D.at)+'"><span class="hint">Uses your device time zone. Must be at least 5 minutes from now.</span><p class="err" id="sched-err" role="alert"></p></div></section>'
+  +'<section class="card"><h2 style="margin-bottom:6px">Review</h2><dl class="sum"><div><dt>Campaign</dt><dd>'+esc(D.name||'Untitled')+'</dd></div><div><dt>Recipients</dt><dd>'+n+' people'+(r.excluded.length?' ('+r.excluded.length+' excluded)':'')+'</dd></div><div><dt>Groups</dt><dd>'+(D.groupIds.length?D.groupIds.map(gname).join(', '):'None')+(D.contactIds.length?' + '+D.contactIds.length+' individuals':'')+'</dd></div><div><dt>Attachment</dt><dd>'+(D.media?esc(D.media.name):'None')+'</dd></div><div><dt>Template</dt><dd>'+(D.templateId?esc((S.templates.find(t=>t.id===D.templateId)||{}).name||'Custom'):'Custom (needs approval for live sending)')+'</dd></div><div><dt>Sending speed</dt><dd>'+S.prefs.rate+' messages per second, about '+eta+' s</dd></div></dl></section>'
+  +(dupe?'<div class="callout warn"><b>Possible duplicate.</b> "'+esc(dupe.name)+'" went to the same people with the same text '+rel(dupe.sentAt||dupe.created)+'.<label class="check"><input type="checkbox" id="c-dupe"'+(D.allowDupe?' checked':'')+'><span>Send it again anyway</span></label></div>':'')
+  +'<section class="card stack"><label class="check"><input type="checkbox" id="c-perm"'+(D.permission?' checked':'')+'><span>These recipients have agreed to receive WhatsApp messages from me<small>Opted-out and pending contacts are never included.</small></span></label><div class="row"><button class="btn" data-act="step" data-to="2">Back</button><button class="btn" data-act="save-draft">Save draft</button><button class="btn primary lg" id="go" data-act="launch">'+ic('send',18)+' '+(later?'Schedule campaign':'Send broadcast')+'</button></div><p class="err" id="go-err" role="alert"></p></section></div>'
+  +'<aside class="stack"><h2>What they will see</h2>'+previewHTML(D.text,sample,D.vars,D.media)+'<p class="small muted">Shown for '+(sample?esc(sample.name):'a sample contact')+'.</p></aside></div>';
+}
+function findDupe(list){
+  if(!list.length)return null;const f=fingerprint(D.text,list.map(c=>c.phone));
+  return S.campaigns.find(c=>c.id!==D.id&&c.fp===f&&['Sending','Completed','Scheduled'].indexOf(c.status)>=0&&now()-(c.sentAt||c.created)<DAY)||null;
+}
+function progressView(c){
+  const done=c.stats.sent+c.stats.failed,tot=c.recipientIds.length||1,pct=Math.round(done/tot*100),fin=c.status!=='Sending';
+  return '<section class="card stack"><div class="row between"><h2>'+esc(c.name)+'</h2><span id="run-pill">'+statusPill(c)+'</span></div>'
+  +'<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'" aria-label="Sending progress"><div data-live="'+c.id+'" data-key="bar" style="width:'+pct+'%"></div></div>'
+  +'<div class="mini"><div><small>Progress</small><b data-live="'+c.id+'" data-key="pct">'+pct+'%</b></div><div><small>Sent</small><b data-live="'+c.id+'" data-key="sent">'+c.stats.sent+'</b></div><div><small>Delivered</small><b data-live="'+c.id+'" data-key="delivered">'+c.stats.delivered+'</b></div><div><small>Read</small><b data-live="'+c.id+'" data-key="read">'+c.stats.read+'</b></div><div><small>Failed</small><b data-live="'+c.id+'" data-key="failed">'+c.stats.failed+'</b></div></div>'
+  +'<p class="small" style="color:var(--warn)" data-live="'+c.id+'" data-key="note" role="status">'+esc(c.note||'')+'</p>'
+  +'<p class="small muted">Simulated results. Nothing was sent to WhatsApp. With a live connection these counts come from WhatsApp status updates.</p>'
+  +(fin?'<div class="row"><a class="btn primary" href="#history">View report</a><button class="btn" data-act="new-broadcast">New broadcast</button></div>':'<p class="small muted">You can leave this page. Sending continues while the app stays open.</p>')+'</section>';
+}
+function broadcast(){
+  if(D.runId){const c=camp(D.runId);if(c)return{html:pageHead('Sending broadcast','Duplicate sends are blocked, and opted-out contacts were removed.')+progressView(c)};D.runId=null;}
+  const html=pageHead(D.id?'Edit campaign':'Create broadcast','Write it, choose who gets it, then review before sending.')+stepper()+'<div id="step-body">'+(D.step===1?step1():D.step===2?step2():step3())+'</div>';
+  return{html,mount(){if(D.step===1)mount1();else if(D.step===2)mount2();else mount3();}};
+}
+function paintPreview(){
+  const el=$('#preview');if(!el)return;
+  const r=resolveRecipients(D).sendable;const sample=r[0]||S.contacts.find(c=>c.consent==='opted_in')||null;
+  el.innerHTML=previewHTML(D.text,sample,D.vars,D.media);
+  const pf=$('#prev-for');if(pf)pf.textContent='Previewing for '+(sample?sample.name:'a sample contact')+'.';
+  const len=D.text.length,cn=$('#counter');
+  if(cn){cn.textContent=nf(len)+' / '+nf(MAXLEN);cn.style.color=len>MAXLEN?'var(--bad)':len>MAXLEN*.9?'var(--warn)':'';}
+  const w=[],keys=usedKeys(D.text),unk=keys.filter(k=>KNOWN.indexOf(k)<0);
+  if(len>MAXLEN)w.push('Over the 1,024 character template limit.');
+  if(unk.length)w.push('Unknown placeholder: '+unk.map(k=>'{{'+k+'}}').join(', ')+'.');
+  if(keys.indexOf('message')>=0&&!D.vars.message.trim())w.push('{{message}} is empty.');
+  if(keys.indexOf('company')>=0){const miss=r.filter(c=>!c.company).length;if(miss)w.push(miss+' recipient'+(miss===1?' has':'s have')+' no company for {{company}}.');}
+  const we=$('#warns');if(we){we.style.color='var(--warn)';we.textContent=w.join(' ');}
+}
+function paintMedia(){
+  const b=$('#media-box');if(!b)return;
+  b.innerHTML=D.media?'<div class="callout info row between"><span>'+ic('clip',16)+' '+esc(D.media.name)+' · '+size(D.media.size)+' · '+D.media.kind+'</span><button class="btn sm" data-act="remove-media">Remove</button></div>':'';
+}
+function mount1(){
+  const ta=$('#msg');
+  paintPreview();paintMedia();
+  const upd=()=>{D.text=ta.value;paintPreview();};
+  ta.addEventListener('input',()=>{D.text=ta.value;if(D.templateId){const t=S.templates.find(x=>x.id===D.templateId);if(t&&t.body!==D.text){D.templateId='';$('#c-tpl').value='';}}paintPreview();});
+  $('#c-name').addEventListener('input',e=>{D.name=e.target.value;});
+  $('#c-var').addEventListener('input',e=>{D.vars.message=e.target.value;paintPreview();});
+  $('#c-tpl').addEventListener('change',e=>{const t=S.templates.find(x=>x.id===e.target.value);D.templateId=e.target.value;if(t){ta.value=t.body;upd();}});
+  $$('[data-ph]').forEach(b=>b.addEventListener('click',()=>insertAt(ta,b.dataset.ph)));
+  $$('[data-emoji]').forEach(b=>b.addEventListener('click',()=>insertAt(ta,b.dataset.emoji)));
+  $('#c-file').addEventListener('change',e=>{
+    const f=e.target.files[0];if(!f)return;const v=validateMedia(f);
+    if(v.error){toast(v.error,'bad');e.target.value='';return;}
+    const set=url=>{D.media={name:f.name,size:f.size,kind:v.kind,url:url||null};paintMedia();paintPreview();toast('Attachment added','good');};
+    if(v.kind==='image'){const fr=new FileReader();fr.onload=()=>set(String(fr.result));fr.readAsDataURL(f);}else set();
+  });
+}
+function insertAt(ta,txt){
+  const s=ta.selectionStart==null?ta.value.length:ta.selectionStart,e=ta.selectionEnd==null?s:ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+txt+ta.value.slice(e);const p=s+txt.length;ta.focus();ta.setSelectionRange(p,p);
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function pickRows(){
+  const q=U.pick.trim().toLowerCase();
+  const l=S.contacts.filter(c=>!q||c.name.toLowerCase().indexOf(q)>=0||c.phone.indexOf(q.replace(/[\s-]/g,''))>=0);
+  if(!l.length)return '<li class="empty">No contacts match.</li>';
+  return l.map(c=>{const ok=c.consent==='opted_in',k=CONSENT[c.consent];
+    return '<li><label class="check"><input type="checkbox" data-con="'+c.id+'"'+(D.contactIds.indexOf(c.id)>=0?' checked':'')+(ok?'':' disabled')+'><span>'+esc(c.name)+'<small class="num">'+esc(fmtPhone(c.phone))+'</small></span>'+(ok?'':pill(k[0],k[1]))+'</label></li>';}).join('');
+}
+function paintRecip(){
+  const r=resolveRecipients(D),box=$('#recip');if(!box)return;
+  const nx=$('#next2');if(nx)nx.disabled=!r.sendable.length;
+  box.innerHTML='<h2>Recipient preview</h2><p><b class="num">'+r.sendable.length+'</b> will receive this broadcast'+(r.excluded.length?', <b class="num">'+r.excluded.length+'</b> excluded.':'.')+'</p>'
+   +(r.excluded.length?'<details><summary>Why were people excluded?</summary><ul class="small">'+r.excluded.map(x=>'<li>'+esc(x.c.name)+': '+x.reason+'</li>').join('')+'</ul></details>':'')
+   +(r.sendable.length?'<ul class="plist">'+r.sendable.map(c=>'<li><div class="check" style="cursor:default"><span style="flex:1;min-width:0">'+esc(c.name)+'<small class="num">'+esc(fmtPhone(c.phone))+(c.company?' · '+esc(c.company):'')+'</small></span></div></li>').join('')+'</ul>':'<div class="callout info">Choose a group or search for individual contacts to build the list.</div>');
+}
+function mount2(){
+  const pl=$('#p-list');pl.innerHTML=pickRows();paintRecip();
+  $$('[data-grp]').forEach(i=>i.addEventListener('change',()=>{const g=i.dataset.grp;D.groupIds=i.checked?D.groupIds.concat(g):D.groupIds.filter(x=>x!==g);paintRecip();}));
+  pl.addEventListener('change',e=>{const i=e.target.closest('[data-con]');if(!i)return;const id=i.dataset.con;D.contactIds=i.checked?D.contactIds.concat(id):D.contactIds.filter(x=>x!==id);paintRecip();});
+  $('#p-q').addEventListener('input',e=>{U.pick=e.target.value;pl.innerHTML=pickRows();});
+}
+function mount3(){
+  const at=$('#c-at');if(at)at.addEventListener('input',e=>{D.at=e.target.value;});
+  const p=$('#c-perm');if(p)p.addEventListener('change',e=>{D.permission=e.target.checked;});
+  const d=$('#c-dupe');if(d)d.addEventListener('change',e=>{D.allowDupe=e.target.checked;});
+}
+function draftCampaignFields(){
+  return{name:D.name.trim()||'Untitled campaign',text:D.text,templateId:D.templateId,draft:{groupIds:D.groupIds.slice(),contactIds:D.contactIds.slice(),vars:Object.assign({},D.vars),media:D.media?{name:D.media.name,size:D.media.size,kind:D.media.kind}:null,templateId:D.templateId}};
+}
+function upsert(c){const i=S.campaigns.findIndex(x=>x.id===c.id);if(i>=0)S.campaigns[i]=c;else S.campaigns.unshift(c);}
+function saveDraft(){
+  const base=D.id?camp(D.id):null,c=Object.assign(base||{id:uid('k'),created:now(),recipientIds:[],stats:{sent:0,delivered:0,read:0,failed:0},errors:[],failedIds:[],note:'',attempts:0,source:WA().mode},draftCampaignFields(),{status:'Draft',scheduledFor:null});
+  D.id=c.id;upsert(c);save();toast('Draft saved','good');
+}
+function loadDraft(c){
+  D=newDraft();D.id=c.id;D.name=c.name;D.text=c.text;D.templateId=(c.draft&&c.draft.templateId)||c.templateId||'';
+  if(c.draft){D.groupIds=c.draft.groupIds.slice();D.contactIds=c.draft.contactIds.slice();D.vars=Object.assign({message:''},c.draft.vars);if(c.draft.media)D.media=Object.assign({url:null},c.draft.media);}
+  if(c.scheduledFor){D.when='later';D.at=toLocalInput(c.scheduledFor);}
+  location.hash='broadcast';
+}
+async function launch(){
+  if(D.launching)return;const err=$('#go-err');const e=m=>{if(err)err.textContent=m;};
+  const r=resolveRecipients(D).sendable;
+  if(!D.name.trim()){e('Give the campaign a name on the Message step.');return;}
+  if(!D.text.trim()||D.text.length>MAXLEN){e('The message is empty or over '+nf(MAXLEN)+' characters.');return;}
+  if(!r.length){e('There are no recipients who can receive this message.');return;}
+  if(!D.permission){e('Confirm that the recipients have agreed to receive messages.');return;}
+  if(!waReady()){e('Connect the WhatsApp API first (WhatsApp API needs your Phone number ID and token).');toast('Connect WhatsApp first.','bad');location.hash='api';return;}
+  const dupe=findDupe(r);if(dupe&&!D.allowDupe){e('This looks like a duplicate of an earlier campaign. Tick "Send it again anyway" to continue.');return;}
+  let at=null;
+  if(D.when==='later'){at=new Date(D.at).getTime();if(!D.at||isNaN(at)||at<now()+5*6e4-1000){$('#sched-err').textContent='Choose a time at least 5 minutes from now.';return;}}
+  D.launching=true;$('#go').disabled=true;
+  if(r.length>S.prefs.largeThreshold){
+    const ok=await confirmDialog({title:'Send to '+r.length+' people?',body:'<p>This is a large campaign (more than '+S.prefs.largeThreshold+' recipients). Check the message and the audience once more. Sent messages cannot be recalled.</p>',ok:D.when==='later'?'Schedule for '+r.length+' people':'Send to '+r.length+' people'});
+    if(!ok){D.launching=false;const g=$('#go');if(g)g.disabled=false;return;}
+  }
+  const base=D.id?camp(D.id):null;
+  const c=Object.assign(base||{id:uid('k'),created:now(),stats:{sent:0,delivered:0,read:0,failed:0},errors:[],failedIds:[],note:'',attempts:0,source:'demo'},draftCampaignFields(),{recipientIds:r.map(x=>x.id),fp:fingerprint(D.text,r.map(x=>x.phone))});
+  if(D.when==='later'){c.status='Scheduled';c.scheduledFor=at;upsert(c);save();D=newDraft();toast('Campaign scheduled for '+fmt(at),'good');location.hash='scheduled';render();return;}
+  c.status='Sending';c.sentAt=now();c.scheduledFor=null;upsert(c);save();D.runId=c.id;D.launching=false;startRun(c.id);render();
+}
+
+/* simulated sending (stands in for the server queue) */
+const runs={};
+const ERRS=[{code:'131026',msg:'Message undeliverable. The number may not be on WhatsApp.'},{code:'131026',msg:'Message undeliverable. The number may not be on WhatsApp.'},{code:'131049',msg:'Not delivered to protect the quality of the messaging ecosystem.'}];
+function startRunSim(cid,queueIn,failRate){
+  const c=camp(cid);if(!c||runs[cid])return;
+  const queue=queueIn?queueIn.slice():c.recipientIds.filter(id=>{const k=cont(id);return k&&k.consent==='opted_in';});
+  if(!queueIn){
+    const skipped=c.recipientIds.length-queue.length;c.recipientIds=queue.slice();
+    c.stats={sent:0,delivered:0,read:0,failed:0};c.errors=[];c.failedIds=[];c.note=skipped?skipped+' contact'+(skipped===1?' was':'s were')+' removed because they opted out or were deleted.':'';
+  }
+  const per=Math.max(1,Math.round(S.prefs.rate/10)),fr=failRate==null?.07:failRate;let wait=0;
+  const r=runs[cid]={timer:null};
+  r.timer=setInterval(()=>{
+    if(wait>0){wait--;return;}
+    if(queue.length>per&&Math.random()<.05){c.note='Rate limit reached (130429). Pausing, then retrying with backoff.';wait=3;paint(c);return;}
+    if(c.note.indexOf('Rate limit')===0)c.note='';
+    for(let i=0;i<per&&queue.length;i++)simOne(c,queue.shift(),fr);
+    paint(c);
+    if(!queue.length){clearInterval(r.timer);delete runs[cid];finish(c);}
+  },300);
+  paint(c);
+}
+function simOne(c,id,fr){
+  const s=c.stats;
+  if(Math.random()<fr){s.failed++;c.failedIds.push(id);const e=pick(ERRS),x=c.errors.find(y=>y.code===e.code);if(x)x.count++;else c.errors.push({code:e.code,msg:e.msg,count:1});return;}
+  s.sent++;const d=Math.random()<.93,rd=d&&Math.random()<.6;if(d)s.delivered++;if(rd)s.read++;
+}
+function paint(c){
+  const done=c.stats.sent+c.stats.failed,tot=c.recipientIds.length||1,pct=Math.round(done/tot*100);
+  $$('[data-live="'+c.id+'"]').forEach(el=>{const k=el.dataset.key;
+    if(k==='bar'){el.style.width=pct+'%';const pb=el.parentNode;if(pb)pb.setAttribute('aria-valuenow',pct);}
+    else if(k==='pct')el.textContent=pct+'%';else if(k==='note')el.textContent=c.note||'';else if(c.stats[k]!=null)el.textContent=c.stats[k];});
+}
+function finish(c){
+  c.status=(c.stats.sent===0&&c.stats.failed>0)?'Failed':'Completed';c.completedAt=now();save();
+  toast('"'+c.name+'" '+(c.status==='Completed'?'finished'+(c.source==='demo'?' (simulated)':''):'failed'),c.status==='Completed'?'good':'bad');
+  const r=route();if(['broadcast','dashboard','history','scheduled'].indexOf(r)>=0&&!mroot.firstChild)render();
+}
+function retryFailed(id){
+  const c=camp(id);if(!c||runs[id]||!c.failedIds.length)return;
+  if((c.attempts||0)>=2){toast('Retry limit reached for this campaign.','bad');return;}
+  const q=c.failedIds.filter(x=>{const k=cont(x);return k&&k.consent==='opted_in';});
+  c.attempts=(c.attempts||0)+1;c.stats.failed=0;c.failedIds=[];c.errors=[];c.status='Sending';c.note='';save();
+  if(!q.length){c.status='Completed';save();toast('Nobody left to retry. The remaining contacts opted out.');render();return;}
+  startRun(id,q,.25);toast('Retrying '+q.length+' failed message'+(q.length===1?'':'s')+' (simulated)');render();
+}
+setInterval(()=>{
+  if(!S.session.signedIn)return;
+  S.campaigns.filter(c=>c.status==='Scheduled'&&c.scheduledFor&&c.scheduledFor<=now()&&!runs[c.id]).forEach(c=>{c.status='Sending';c.sentAt=now();c.scheduledFor=null;save();startRun(c.id);toast('Scheduled campaign "'+c.name+'" started');if(route()==='scheduled'||route()==='dashboard')render();});
+},15000);
+
+/* scheduled */
+function scheduled(){
+  const sch=S.campaigns.filter(c=>c.status==='Scheduled').sort((a,b)=>a.scheduledFor-b.scheduledFor),dr=S.campaigns.filter(c=>c.status==='Draft');
+  const row=c=>{const n=c.status==='Scheduled'?c.recipientIds.length:resolveRecipients(c.draft||{groupIds:[],contactIds:[]}).sendable.length;
+   return '<li class="crow" style="grid-template-areas:\'main acts\' \'meta meta\';grid-template-columns:minmax(0,1fr) auto"><div class="main" style="grid-area:main"><b>'+esc(c.name)+'</b><span>'+(c.status==='Scheduled'?fmt(c.scheduledFor)+' · '+rel(c.scheduledFor):'Saved '+rel(c.created))+' · '+n+' recipients</span></div><div class="acts" style="grid-area:acts"><button class="icon-btn" data-act="camp-edit" data-id="'+c.id+'" aria-label="Edit '+esc(c.name)+'">'+ic('edit',18)+'</button><button class="icon-btn bad" data-act="camp-del" data-id="'+c.id+'" aria-label="Delete '+esc(c.name)+'">'+ic('trash',18)+'</button></div><div class="meta" style="grid-area:meta">'+statusPill(c)+(c.status==='Scheduled'?'<button class="btn sm primary" data-act="camp-now" data-id="'+c.id+'">Send now</button><button class="btn sm" data-act="camp-unschedule" data-id="'+c.id+'">Cancel schedule</button>':'<button class="btn sm primary" data-act="camp-edit" data-id="'+c.id+'">Continue editing</button>')+'</div></li>';};
+  const html=pageHead('Scheduled campaigns','Upcoming sends and saved drafts.','<a class="btn primary" href="#broadcast" data-act="new-broadcast">'+ic('plus',18)+' New broadcast</a>')
+  +'<section class="card flush"><div class="card-h"><h2>Scheduled</h2></div><ul class="list">'+(sch.length?sch.map(row).join(''):'<li class="empty"><b>Nothing scheduled</b>Pick "Schedule for later" when you review a broadcast.</li>')+'</ul></section>'
+  +'<section class="card flush"><div class="card-h"><h2>Drafts</h2></div><ul class="list">'+(dr.length?dr.map(row).join(''):'<li class="empty"><b>No drafts</b>Use "Save draft" while composing.</li>')+'</ul></section>'
+  +'<p class="small muted">In this demo, scheduled campaigns start only while this page is open. A live deployment runs them from a background job on the server. Opt-outs are checked again at send time.</p>';
+  return{html};
+}
+
+/* history */
+function filteredHist(){
+  const f=U.hist,q=f.q.trim().toLowerCase(),from=f.from?new Date(f.from+'T00:00:00').getTime():0,to=f.to?new Date(f.to+'T23:59:59').getTime():Infinity;
+  return sentCampaigns().filter(c=>{const t=c.sentAt||c.created;return(!q||c.name.toLowerCase().indexOf(q)>=0)&&(!f.s||c.status===f.s)&&t>=from&&t<=to;}).sort((a,b)=>(b.sentAt||b.created)-(a.sentAt||a.created));
+}
+function campDetail(c){
+  const s=c.stats,tot=c.recipientIds.length||1,p=n=>Math.round(n/tot*100)+'%';
+  return '<div class="cbody"><div class="mini"><div><small>Recipients</small><b>'+c.recipientIds.length+'</b></div><div><small>Sent</small><b data-live="'+c.id+'" data-key="sent">'+s.sent+'</b></div><div><small>Delivered</small><b data-live="'+c.id+'" data-key="delivered">'+s.delivered+'</b></div><div><small>Read</small><b data-live="'+c.id+'" data-key="read">'+s.read+'</b></div><div><small>Failed</small><b data-live="'+c.id+'" data-key="failed">'+s.failed+'</b></div></div>'
+  +sbar(s)+'<div class="row">'+(WA().mode==='demo'?pill('Simulated demo data','warn'):'')+'<span class="small muted">Delivery '+p(s.delivered)+' · read '+p(s.read)+' of recipients. Read counts exclude people with read receipts off.</span></div>'
+  +(c.note?'<div class="callout warn">'+esc(c.note)+'</div>':'')
+  +(c.errors.length?'<div class="scroll"><table class="t"><thead><tr><th>Error code</th><th>Details</th><th>Messages</th></tr></thead><tbody>'+c.errors.map(e=>'<tr><td class="mono">'+esc(e.code)+'</td><td>'+esc(e.msg)+'</td><td class="num">'+e.count+'</td></tr>').join('')+'</tbody></table></div>':'<p class="small muted">No errors reported.</p>')
+  +'<div><h3 style="margin-bottom:6px">Message</h3><p class="tbody" style="max-height:none">'+esc(c.text)+'</p></div>'
+  +'<div class="row">'+(s.failed>0&&c.status!=='Sending'?((c.attempts||0)<2?'<button class="btn sm" data-act="retry" data-id="'+c.id+'">'+ic('refresh',16)+' Retry '+s.failed+' failed ('+(2-(c.attempts||0))+' left)</button>':'<span class="small muted">Retry limit reached.</span>'):'')+'</div></div>';
+}
+function histRows(){
+  const l=filteredHist();
+  if(!l.length)return '<div class="empty"><b>No campaigns match</b>Change the search or date filters.</div>';
+  return l.map(c=>{const s=c.stats;
+   return '<details class="camp"><summary><div class="nm"><b>'+esc(c.name)+'</b><span>'+fmt(c.sentAt||c.created)+'</span></div>'+statusPill(c)+'<div class="sc-row"><span><b>'+c.recipientIds.length+'</b> recipients</span><span><b data-live="'+c.id+'" data-key="sent">'+s.sent+'</b> sent</span><span><b data-live="'+c.id+'" data-key="delivered">'+s.delivered+'</b> delivered</span><span><b data-live="'+c.id+'" data-key="read">'+s.read+'</b> read</span><span><b data-live="'+c.id+'" data-key="failed">'+s.failed+'</b> failed</span></div></summary>'+campDetail(c)+'</details>';}).join('');
+}
+function history(){
+  const f=U.hist,a=aggregate(filteredHist());
+  const html=pageHead('Campaign history','Results for every campaign that has been sent.','<button class="btn" data-act="export">'+ic('download',18)+' Export report</button>')
+  +'<section class="card"><div class="card-h"><h2>Totals for this view</h2>'+(WA().mode==='demo'?pill('Simulated demo data','warn'):'')+'</div>'+(a.sent+a.failed?sbar(a)+'<div style="height:10px"></div>'+legend(a):'<p class="muted">No results to show.</p>')+'</section>'
+  +'<section class="card flush"><div class="toolbar" style="padding-top:16px"><div class="wide field"><label for="h-q" style="position:absolute;left:-9999px">Search campaigns</label><input class="in" id="h-q" type="search" placeholder="Search campaigns" value="'+esc(f.q)+'"></div>'
+  +'<div class="field"><label for="h-s" style="position:absolute;left:-9999px">Status</label><select class="in" id="h-s"><option value="">All statuses</option>'+['Completed','Sending','Failed'].map(s=>'<option'+(f.s===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'
+  +'<div class="field"><label class="hint" for="h-from">From</label><input class="in" id="h-from" type="date" value="'+esc(f.from)+'"></div><div class="field"><label class="hint" for="h-to">To</label><input class="in" id="h-to" type="date" value="'+esc(f.to)+'"></div></div><div id="h-list">'+histRows()+'</div></section>';
+  return{html,mount(){
+    const up=()=>{$('#h-list').innerHTML=histRows();};
+    $('#h-q').addEventListener('input',e=>{U.hist.q=e.target.value;up();});
+    $('#h-s').addEventListener('change',e=>{U.hist.s=e.target.value;up();});
+    $('#h-from').addEventListener('change',e=>{U.hist.from=e.target.value;up();});
+    $('#h-to').addEventListener('change',e=>{U.hist.to=e.target.value;up();});
+  }};
+}
+function csvCell(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function exportCSV(){
+  const head=['Campaign','Status','Date','Recipients','Sent','Delivered','Read','Failed','Errors','Data source'];
+  const rows=filteredHist().map(c=>[c.name,c.status,new Date(c.sentAt||c.created).toISOString(),c.recipientIds.length,c.stats.sent,c.stats.delivered,c.stats.read,c.stats.failed,c.errors.map(e=>e.code+' x'+e.count).join('; '),({api:'WhatsApp API',link:'WhatsApp links'}[c.source]||'Simulated demo data')]);
+  const csv=[head].concat(rows).map(r=>r.map(csvCell).join(',')).join('\n');
+  openModal({title:'Export report',wide:true,body:'<p class="muted small">Downloads are not available inside this page, so copy the CSV and paste it into a spreadsheet or a .csv file.</p><textarea class="in mono" id="csv-out" readonly style="min-height:220px;white-space:pre">'+esc(csv)+'</textarea>',footer:'<button class="btn" data-act="modal-close">Close</button><button class="btn primary" data-act="copy-csv">'+ic('copy',16)+' Copy CSV</button>'});
+}
+
+
+/* WhatsApp connection: links or Cloud API */
+function WA(){if(!S.wa)S.wa={mode:'demo',phoneId:'',token:'',ver:'v21.0',lang:'en_US',status:'',name:'',err:''};return S.wa;}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const slug=n=>String(n).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+const digits=p=>String(p).replace(/\D/g,'');
+function waReady(){const W=WA();return W.mode!=='api'||!!(W.phoneId&&W.token);}
+function demoBanner(){return WA().mode==='demo'?demoBar:'';}
+function quickStart(){
+  if(WA().mode!=='demo')return '';
+  return '<section class="card stack" aria-label="Quick start"><h2>Start in 3 easy steps</h2><ol style="margin:0;padding-left:20px;display:grid;gap:6px"><li><b>Connect WhatsApp</b> (about 1 minute). Choose WhatsApp links or the Business API.</li><li><b>Add your contacts</b> on the Contacts page, or import a list.</li><li><b>Create a broadcast</b>, review it, and send.</li></ol><div class="row"><a class="btn primary" href="#api">Connect WhatsApp</a></div></section>';
+}
+function waPayload(text,tid,k,vars,to){
+  const t=tid&&S.templates.find(x=>x.id===tid);
+  if(t){const keys=usedKeys(t.body);
+    const comp=keys.length?[{type:'body',parameters:keys.map(key=>({type:'text',text:(fill('{{'+key+'}}',k,vars)||'-').replace(/\s*\n\s*/g,' ')}))}]:[];
+    return{messaging_product:'whatsapp',to:to,type:'template',template:{name:slug(t.name),language:{code:WA().lang||'en_US'},components:comp}};}
+  return{messaging_product:'whatsapp',to:to,type:'text',text:{preview_url:false,body:fill(text,k,vars)}};
+}
+async function waSend(payload){
+  const W=WA();
+  try{
+    const r=await fetch('https://graph.facebook.com/'+W.ver+'/'+encodeURIComponent(W.phoneId)+'/messages',{method:'POST',headers:{'Authorization':'Bearer '+W.token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok)return{ok:true};
+    const e=j.error||{};return{ok:false,code:String(e.code||r.status),msg:e.error_user_msg||e.message||('Request failed ('+r.status+')')};
+  }catch(x){return{ok:false,code:'network',msg:'Could not reach Meta. If this page is hosted in a place that blocks outside requests, download the file and open it on your computer.'};}
+}
+async function waCheck(){
+  const W=WA();
+  if(!W.phoneId||!W.token){toast('Enter the Phone number ID and access token first.','bad');return false;}
+  try{
+    const r=await fetch('https://graph.facebook.com/'+W.ver+'/'+encodeURIComponent(W.phoneId)+'?fields=display_phone_number,verified_name',{headers:{'Authorization':'Bearer '+W.token}});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok){W.status='ok';W.name=(j.verified_name||'')+' '+(j.display_phone_number||'');W.err='';save();toast('Connected to WhatsApp','good');return true;}
+    W.status='bad';W.err=(j.error&&j.error.message)||('Failed ('+r.status+')');save();toast('Connection failed: '+W.err,'bad');return false;
+  }catch(x){W.status='bad';W.err='Could not reach Meta. If this page blocks outside requests, download the file and open it on your computer.';save();toast(W.err,'bad');return false;}
+}
+function prepQueue(c,queueIn){
+  const queue=queueIn?queueIn.slice():c.recipientIds.filter(id=>{const k=cont(id);return k&&k.consent==='opted_in';});
+  if(!queueIn){const skipped=c.recipientIds.length-queue.length;c.recipientIds=queue.slice();
+    c.stats={sent:0,delivered:0,read:0,failed:0};c.errors=[];c.failedIds=[];c.note=skipped?skipped+' contact'+(skipped===1?' was':'s were')+' removed because they opted out or were deleted.':'';}
+  return queue;
+}
+function addErr(c,code,msg){const x=c.errors.find(y=>y.code===code);if(x)x.count++;else c.errors.push({code:code,msg:msg,count:1});}
+function startRun(cid,queueIn,failRate){
+  const c=camp(cid);if(!c||runs[cid])return;const m=WA().mode;c.source=m;
+  if(m==='api')return runApi(c,prepQueue(c,queueIn));
+  if(m==='link')return openLinkSender(c,prepQueue(c,queueIn));
+  return startRunSim(cid,queueIn,failRate);
+}
+async function runApi(c,queue){
+  const run=runs[c.id]={timer:null};const gap=Math.max(50,Math.round(1000/Math.max(1,S.prefs.rate)));const vars=(c.draft&&c.draft.vars)||{};const tid=c.draft&&c.draft.templateId;
+  paint(c);let stopAll=null;
+  while(queue.length){
+    const id=queue.shift(),k=cont(id);if(!k)continue;
+    if(stopAll){c.stats.failed++;c.failedIds.push(id);addErr(c,stopAll.code,stopAll.msg);continue;}
+    let res=await waSend(waPayload(c.text,tid,k,vars,digits(k.phone)));
+    if(!res.ok&&res.code==='130429'){c.note='Rate limit reached. Pausing, then retrying.';paint(c);await sleep(3000);c.note='';res=await waSend(waPayload(c.text,tid,k,vars,digits(k.phone)));}
+    if(res.ok)c.stats.sent++;
+    else{c.stats.failed++;c.failedIds.push(id);addErr(c,res.code,res.msg);if(res.code==='190'||res.code==='network'||res.code==='100'&&/phone number id|parameter/i.test(res.msg)&&c.stats.sent===0)stopAll=res;}
+    paint(c);await sleep(gap);
+  }
+  delete runs[c.id];finish(c);
+}
+let LS=null;
+function lsUrl(){const c=camp(LS.cid),k=cont(LS.q[LS.i]);return 'https://api.whatsapp.com/send?phone='+digits(k.phone)+'&text='+encodeURIComponent(fill(c.text,k,(c.draft&&c.draft.vars)||{}));}
+function lsBody(){
+  const c=camp(LS.cid),k=cont(LS.q[LS.i]);
+  return '<div class="stack"><p class="muted small">Person '+(LS.i+1)+' of '+LS.q.length+'</p><div><div class="ls-name">'+esc(k.name)+'</div><div class="muted">'+esc(fmtPhone(k.phone))+'</div></div>'+previewHTML(c.text,k,(c.draft&&c.draft.vars)||{},null)+(LS.blocked?'<div class="callout warn">This viewer blocked the pop-up. Open the link below (or copy the message and paste it into WhatsApp), send it, then press "I sent it, next person".</div><a class="btn ls-go" href="'+esc(lsUrl())+'" target="_blank" rel="noopener noreferrer">Open link manually</a><div class="row"><button class="btn sm" data-act="copy" data-text="'+esc(fill(c.text,k,(c.draft&&c.draft.vars)||{}))+'">'+ic('copy',16)+' Copy message</button><button class="btn sm" data-act="copy" data-text="'+esc(lsUrl())+'">'+ic('copy',16)+' Copy link</button></div><button class="btn primary ls-go" data-act="ls-done">I sent it, next person</button>':'<button class="btn primary ls-go" data-act="ls-open">'+ic('send',18)+' Open WhatsApp chat</button><p class="small muted">WhatsApp opens with the message filled in. Press send there, then come back here for the next person.</p>')+'</div>';
+}
+function openLinkSender(c,queue){
+  runs[c.id]={timer:null};
+  if(!queue.length){delete runs[c.id];finish(c);return;}
+  LS={cid:c.id,q:queue,i:0};
+  openModal({title:'Send with WhatsApp links',body:lsBody(),footer:'<button class="btn" data-act="ls-stop">Finish later</button><button class="btn" data-act="ls-skip">Skip this person</button>'});
+}
+function lsAdvance(ok){
+  const c=camp(LS.cid),id=LS.q[LS.i];
+  if(ok)c.stats.sent++;else{c.stats.failed++;c.failedIds.push(id);addErr(c,'skipped','Skipped by you.');}
+  LS.i++;save();
+  if(LS.i>=LS.q.length){lsEnd();return;}
+  const b=$('.mbody',mroot);if(b)b.innerHTML=lsBody();
+}
+function lsEnd(){
+  const c=camp(LS.cid);
+  for(let j=LS.i;j<LS.q.length;j++){c.stats.failed++;c.failedIds.push(LS.q[j]);}
+  if(LS.i<LS.q.length)addErr(c,'skipped','Not sent yet. Use Retry failed to continue.');
+  const id=LS.cid;LS=null;delete runs[id];closeModal();finish(c);render();
+}
+async function waTest(e164){
+  const W=WA();
+  if(W.mode==='link'){const u='https://api.whatsapp.com/send?phone='+digits(e164)+'&text='+encodeURIComponent(fill(D.text,null,D.vars));let w=null;try{w=window.open(u,'_blank');}catch(x){}if(!w){try{await navigator.clipboard.writeText(u);toast('Pop-up blocked here. The test link was copied. Paste it in your browser.','bad');}catch(x){toast('Pop-up blocked in this viewer. Open the file in your browser instead.','bad');}}return;}
+  if(W.mode!=='api'){toast('Test message to '+fmtPhone(e164)+' simulated. Nothing was sent.','good');return;}
+  if(!waReady()){toast('Connect the WhatsApp API first.','bad');location.hash='api';return;}
+  const r=await waSend(waPayload(D.text,D.templateId,null,D.vars,digits(e164)));
+  toast(r.ok?'Test message sent to '+fmtPhone(e164):'Test failed: '+r.msg,r.ok?'good':'bad');
+}
+function saveWaFields(){
+  const p=$('#wa-phone');if(!p)return;const W=WA();
+  W.phoneId=p.value.trim();W.token=$('#wa-token').value.trim();W.lang=$('#wa-lang').value.trim()||'en_US';W.ver=$('#wa-ver').value.trim()||'v21.0';save();
+}
+const WAACT={
+  'wa-mode':t=>{saveWaFields();WA().mode=t.dataset.v;save();render();},
+  'wa-save':async()=>{saveWaFields();await waCheck();render();},
+  'wa-disconnect':()=>{const W=WA();W.token='';W.phoneId='';W.status='';W.name='';save();toast('Disconnected. Your credentials were removed from this browser.');render();},
+  'ls-open':()=>{if(!LS)return;let w=null;try{w=window.open(lsUrl(),'_blank');if(w)w.opener=null;}catch(x){}
+    if(w){lsAdvance(true);return;}
+    LS.blocked=true;const b=$('.mbody',mroot);if(b)b.innerHTML=lsBody();},
+  'ls-done':()=>{if(LS){LS.blocked=false;lsAdvance(true);}},
+  'ls-skip':()=>{if(LS)lsAdvance(false);},
+  'ls-stop':()=>{if(LS)lsEnd();}
+};
+function api(){
+  const W=WA(),m=W.mode;
+  const opt=(v,t,d)=>'<button type="button" class="wa-opt" data-act="wa-mode" data-v="'+v+'" aria-pressed="'+(m===v)+'"><b>'+t+'</b><span>'+d+'</span></button>';
+  let h=pageHead('Connect WhatsApp','Choose how messages are sent. You can change this any time.')
+  +'<section class="card stack"><h2>How should messages be sent?</h2><div class="wa-opts">'
+  +opt('link','WhatsApp links (easiest)','No setup. WhatsApp opens for each person with your message ready, and you press send.')
+  +opt('api','WhatsApp Business API','Sends automatically to everyone. Needs a one-time setup with Meta.')
+  +opt('demo','Demo','Practice with sample data. Nothing is sent.')+'</div></section>';
+  if(m==='link')h+='<section class="card stack"><div class="row between"><h2>Ready to use</h2>'+pill('Connected','good')+'</div><p>Nothing to set up. When you press Send on a broadcast, you will step through your contacts one by one. Each step opens a WhatsApp chat with the message already written.</p><div class="callout info">This works with any WhatsApp or WhatsApp Business app. It is best for lists up to a few dozen people. For bigger lists, use the Business API.</div><a class="btn primary" href="#broadcast">Create a broadcast</a></section>';
+  if(m==='api'){
+    const tr=S.templates.map(t=>'<tr><td>'+esc(t.name)+'</td><td><code>'+esc(slug(t.name))+'</code></td><td>'+(usedKeys(t.body).map((k,i)=>'{{'+(i+1)+'}} = '+esc(k)).join(', ')||'No variables')+'</td></tr>').join('');
+    h+='<section class="card stack"><div class="row between"><h2>Your WhatsApp Business API details</h2>'+(W.status==='ok'?pill('Connected: '+W.name.trim(),'good'):W.status==='bad'?pill('Connection failed','bad'):pill('Not tested yet','warn'))+'</div>'
+    +(location.protocol!=='file:'?'<div class="callout info">Sending through the API needs a normal browser tab. If testing says it could not reach Meta, download this file and open it in Chrome or Edge on your computer.</div>':'')+(W.status==='bad'?'<div class="callout warn">'+esc(W.err)+'</div>':'')
+    +'<div class="formgrid"><div class="field"><label for="wa-phone">Phone number ID</label><input class="in" id="wa-phone" inputmode="numeric" autocomplete="off" value="'+esc(W.phoneId)+'" placeholder="For example 109876543210987"><span class="hint">Found in Meta, WhatsApp, API Setup. It is not the phone number itself.</span></div>'
+    +'<div class="field"><label for="wa-token">Access token</label><input class="in" id="wa-token" type="password" autocomplete="off" value="'+esc(W.token)+'" placeholder="Paste your token"><span class="hint">A temporary token lasts 24 hours. Use a system user token for ongoing use.</span></div>'
+    +'<div class="field"><label for="wa-lang">Template language</label><input class="in" id="wa-lang" value="'+esc(W.lang)+'"><span class="hint">Must match your approved templates, for example en_US or en.</span></div>'
+    +'<div class="field"><label for="wa-ver">API version</label><input class="in" id="wa-ver" value="'+esc(W.ver)+'"></div></div>'
+    +'<div class="row"><button class="btn primary" data-act="wa-save">Save and test connection</button>'+(W.token||W.phoneId?'<button class="btn danger" data-act="wa-disconnect">Disconnect</button>':'')+'</div>'
+    +'<div class="callout warn">Your token is stored only in this browser. Use this on a device you trust, and press Disconnect when you are done. Messages go straight from this page to Meta. If the page is hosted somewhere that blocks outside requests, download the file and open it on your computer.</div></section>'
+    +'<section class="card stack"><h2>Setup in 5 steps</h2><ol style="margin:0;padding-left:20px;display:grid;gap:8px">'
+    +'<li>Open <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">Meta for Developers</a>, create a Business app and add the WhatsApp product.</li>'
+    +'<li>In WhatsApp, API Setup, copy the <b>Phone number ID</b>.</li>'
+    +'<li>Copy the temporary access token to test, or create a permanent one in <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener">Business Settings, System users</a> with the whatsapp_business_messaging permission.</li>'
+    +'<li>Paste both above and press <b>Save and test connection</b>.</li>'
+    +'<li>Create message templates in <a href="https://business.facebook.com/wa/manage/message-templates/" target="_blank" rel="noopener">WhatsApp Manager</a>. Use the names in the table below.</li></ol>'
+    +'<div class="callout info">WhatsApp only lets you message people who have not written to you in the last 24 hours with an <b>approved template</b>. Pick a template on the broadcast Message step for real sending. Plain text only reaches people who recently messaged you.</div></section>'
+    +'<section class="card flush"><div class="card-h"><h2>Template names to use in Meta</h2></div><div class="scroll" style="padding:0 18px 16px"><table class="t"><thead><tr><th>Template here</th><th>Name in Meta</th><th>Variables in Meta</th></tr></thead><tbody>'+tr+'</tbody></table></div></section>';
+  }
+  if(m==='demo')h+='<section class="card stack"><div class="row between"><h2>Demo mode</h2>'+pill('Demo','warn')+'</div><p>Sending, delivery and results are simulated with sample data. Pick WhatsApp links or the Business API above to send real messages.</p></section>';
+  return{html:h};
+}
+
+function apiOld(){
+  const env=[['WHATSAPP_ACCESS_TOKEN','Long-lived system user token from Meta Business settings.'],['WHATSAPP_PHONE_NUMBER_ID','ID of the sending phone number (not the number itself).'],['WHATSAPP_BUSINESS_ACCOUNT_ID','WhatsApp Business Account ID, used to manage templates.'],['WHATSAPP_APP_SECRET','Used to verify that webhook calls really come from Meta.'],['WHATSAPP_WEBHOOK_VERIFY_TOKEN','A string you choose, entered once in the Meta webhook settings.']];
+  const steps=['Create a Meta Business account and verify your business.','Add a WhatsApp Business Account and register a phone number.','Create a system user and generate a permanent access token.','Set the five environment variables on the server (never in this app).','Point the Meta webhook to your server\'s /api/whatsapp/webhook endpoint.','Submit message templates and wait for approval.'];
+  const inb=S.inbound.map(m=>{const c=cont(m.from);if(!c)return '';const stop=/^\s*(stop|unsubscribe|cancel)\s*$/i.test(m.text);
+    return '<li class="crow" style="grid-template-areas:\'main acts\';grid-template-columns:minmax(0,1fr) auto"><div class="main" style="grid-area:main"><b>'+esc(c.name)+'</b><span style="white-space:normal">'+esc(m.text)+' · '+rel(m.ts)+'</span></div><div class="acts" style="grid-area:acts">'+(stop?(c.consent==='opted_out'?pill('Opted out','bad'):'<button class="btn sm danger" data-act="apply-stop" data-id="'+m.id+'">Opt out contact</button>'):'')+'</div></li>';}).join('');
+  const html=pageHead('WhatsApp API','Connect the official WhatsApp Business Platform (Cloud API) from your server.')
+  +'<section class="card stack"><div class="row between"><h2>Connection</h2>'+pill('Demo mode','warn')+'</div><div class="callout warn">No credentials are configured on a server, so sending, delivery status and templates are simulated. Access tokens are never entered or stored in this browser app.</div><button class="btn" disabled>Test connection (available after server setup)</button></section>'
+  +'<section class="card stack"><h2>Server setup checklist</h2><ol style="margin:0;padding-left:20px;display:grid;gap:8px">'+steps.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ol></section>'
+  +'<section class="card flush"><div class="card-h"><h2>Server environment variables</h2></div><div class="scroll" style="padding:0 18px 16px"><table class="t"><thead><tr><th>Name</th><th>Purpose</th><th></th></tr></thead><tbody>'+env.map(e=>'<tr><td><code>'+e[0]+'</code></td><td>'+esc(e[1])+'</td><td><button class="icon-btn" data-act="copy" data-text="'+e[0]+'" aria-label="Copy '+e[0]+'">'+ic('copy',16)+'</button></td></tr>').join('')+'</tbody></table></div></section>'
+  +'<section class="card stack"><h2>What needs credentials</h2><div class="formgrid"><div><h3>Works now (demo)</h3><ul class="small" style="padding-left:18px;margin:6px 0 0"><li>Contacts, groups and consent records</li><li>Composer, preview and templates</li><li>Campaign setup, scheduling and reports with simulated results</li></ul></div><div><h3>Needs the live API</h3><ul class="small" style="padding-left:18px;margin:6px 0 0"><li>Real sending and verified delivery counts</li><li>Template approval from Meta</li><li>Inbound replies and automatic opt-outs</li><li>Background jobs for scheduled sends</li></ul></div></div></section>'
+  +'<section class="card flush"><div class="card-h"><h2>Inbound messages</h2>'+pill('Sample data','warn')+'</div><ul class="list">'+(inb||'<li class="empty">No inbound messages.</li>')+'</ul><p class="small muted" style="padding:12px 18px 16px">A live webhook receives replies like these. A reply of STOP marks the contact as opted out so they are excluded from every future send.</p></section>';
+  return{html};
+}
+
+/* profile */
+function profile(){
+  const p=S.prefs,u=S.user;
+  const html=pageHead('Profile & preferences','Your account and sending defaults.')
+  +'<form id="profile-form" class="stack" novalidate><section class="card stack"><h2>Account</h2><div class="formgrid"><div class="field"><label for="u-name">Name</label><input class="in" id="u-name" value="'+esc(u.name)+'"></div><div class="field"><label for="u-email">Email</label><input class="in" id="u-email" type="email" value="'+esc(u.email)+'"></div><div class="field"><label for="u-biz">Business name</label><input class="in" id="u-biz" value="'+esc(u.business)+'"></div><div class="field"><label for="u-role">Role</label><select class="in" id="u-role" disabled><option>'+esc(u.role)+'</option></select><span class="hint">Owner, Admin, Sender and Viewer roles are enforced on the server.</span></div></div></section>'
+  +'<section class="card stack"><h2>Sending defaults</h2><div class="formgrid"><div class="field"><label for="p-cc">Default country code</label><select class="in" id="p-cc">'+[['+91','India (+91)'],['+1','United States / Canada (+1)'],['+44','United Kingdom (+44)'],['+971','UAE (+971)'],['+61','Australia (+61)'],['+65','Singapore (+65)'],['+880','Bangladesh (+880)'],['+977','Nepal (+977)']].map(c=>'<option value="'+c[0]+'"'+(p.cc===c[0]?' selected':'')+'>'+c[1]+'</option>').join('')+'</select></div>'
+  +'<div class="field"><label for="p-large">Ask for confirmation above</label><input class="in" id="p-large" type="number" min="1" max="100000" value="'+p.largeThreshold+'"><span class="hint">Recipients. Larger campaigns need an extra confirmation.</span></div>'
+  +'<div class="field"><label for="p-rate">Messages per second</label><input class="in" id="p-rate" type="number" min="1" max="80" value="'+p.rate+'"><span class="hint">1 to 80. The Cloud API allows up to 80 per second by default.</span></div></div></section>'
+  +'<section class="card stack"><h2>Appearance</h2><div class="seg" role="radiogroup" aria-label="Theme">'+['system','light','dark'].map(t=>'<button type="button" role="radio" aria-checked="'+(p.theme===t)+'" aria-selected="'+(p.theme===t)+'" data-act="set-theme" data-v="'+t+'">'+t[0].toUpperCase()+t.slice(1)+'</button>').join('')+'</div></section>'
+  +'<div class="row"><button class="btn primary" type="submit">Save changes</button><button type="button" class="btn" data-act="signout">'+ic('logout',16)+' Sign out</button><button type="button" class="btn danger" data-act="reset">Reset demo data</button></div></form>';
+  return{html};
+}
+
+const views={dashboard,contacts,groups,broadcast,templates,scheduled,history,api,profile};
+const app=$('#app');
+function render(){
+  try{
+    applyTheme();
+    if(!S.session.signedIn){app.innerHTML=authView();return;}
+    const r=route(),v=views[r]();
+    app.innerHTML=shell(r,v.html);
+    if(v.mount)v.mount();
+  }catch(err){
+    console.error(err);
+    app.innerHTML='<div class="card stack" style="max-width:520px;margin:40px auto"><h2>Something went wrong</h2><p class="muted">'+esc(err.message)+'</p><button class="btn primary" data-act="reset-view">Go to dashboard</button></div>';
+  }
+}
+window.addEventListener('hashchange',()=>{if(mroot.firstChild)closeModal();render();window.scrollTo(0,0);});
+
+/* ---------- events ---------- */
+const A={
+  'modal-close':()=>closeModal(),'modal-cancel':()=>closeModal(),'modal-ok':()=>closeModal(true),
+  'reset-view':()=>{location.hash='dashboard';render();},
+  theme:()=>{const o=['system','light','dark'];S.prefs.theme=o[(o.indexOf(S.prefs.theme)+1)%3];save();applyTheme();toast('Theme: '+S.prefs.theme);},
+  'set-theme':t=>{S.prefs.theme=t.dataset.v;save();render();},
+  signout:()=>{closeModal();S.session.signedIn=false;save();render();},
+  'demo-enter':()=>{S.session.signedIn=true;save();location.hash='dashboard';render();},
+  'auth-mode':t=>{U.authMode=t.dataset.mode;render();},
+  more:()=>{openModal({title:'More',noFocus:true,body:'<div class="sheetnav">'+NAV.filter(n=>['groups','templates','scheduled','api','profile'].indexOf(n[0])>=0).map(n=>'<a href="#'+n[0]+'">'+ic(n[2])+n[1]+'</a>').join('')+'<button data-act="theme">'+ic('moon')+'Switch theme</button><button data-act="signout">'+ic('logout')+'Sign out</button></div>'});},
+  'add-contact':()=>contactModal(),'edit-contact':t=>contactModal(t.dataset.id),
+  'del-contact':async t=>{const c=cont(t.dataset.id);if(!c)return;if(await confirmDialog({title:'Delete contact?',body:'<p>'+esc(c.name)+' will be removed from your list. This cannot be undone.</p>',ok:'Delete',danger:true})){S.contacts=S.contacts.filter(x=>x.id!==c.id);save();toast('Contact deleted');render();}},
+  import:()=>importModal(),dedupe:()=>dedupe(),
+  'add-group':()=>groupModal(),'edit-group':t=>groupModal(t.dataset.id),
+  'del-group':async t=>{const g=S.groups.find(x=>x.id===t.dataset.id);if(!g)return;if(await confirmDialog({title:'Delete group "'+esc(g.name)+'"?',body:'<p>The group is removed. The contacts in it stay in your list.</p>',ok:'Delete group',danger:true})){S.groups=S.groups.filter(x=>x.id!==g.id);S.contacts.forEach(c=>{c.groups=c.groups.filter(x=>x!==g.id);});save();toast('Group deleted');render();}},
+  'view-group':t=>{U.contacts={q:'',g:t.dataset.id,c:''};location.hash='contacts';},
+  'broadcast-group':t=>{D=newDraft();D.groupIds=[t.dataset.id];D.step=1;location.hash='broadcast';render();},
+  'tmpl-new':()=>templateModal(),'tmpl-edit':t=>templateModal(t.dataset.id),
+  'tmpl-del':async t=>{const x=S.templates.find(y=>y.id===t.dataset.id);if(!x)return;if(await confirmDialog({title:'Delete template?',body:'<p>"'+esc(x.name)+'" will be removed.</p>',ok:'Delete',danger:true})){S.templates=S.templates.filter(y=>y.id!==x.id);save();toast('Template deleted');render();}},
+  'tmpl-use':t=>{const x=S.templates.find(y=>y.id===t.dataset.id);if(!x||x.status!=='approved'){toast('Only approved templates can be used.','bad');return;}D=newDraft();D.templateId=x.id;D.text=x.body;location.hash='broadcast';render();},
+  'tmpl-approve':t=>{const x=S.templates.find(y=>y.id===t.dataset.id);if(x){x.status='approved';save();toast('Template marked approved (simulated)','good');render();}},
+  step:t=>{
+    const to=+t.dataset.to;
+    if(to>1&&(!D.name.trim()||!D.text.trim())){toast('Add a campaign name and a message first.','bad');D.step=1;render();return;}
+    if(to>2&&!resolveRecipients(D).sendable.length){toast('Choose at least one recipient who can receive messages.','bad');D.step=2;render();return;}
+    D.step=to;render();window.scrollTo(0,0);},
+  'emoji-toggle':t=>{const p=$('#emoji-panel');p.hidden=!p.hidden;t.setAttribute('aria-expanded',String(!p.hidden));},
+  attach:()=>$('#c-file').click(),
+  'remove-media':()=>{D.media=null;const f=$('#c-file');if(f)f.value='';paintMedia();paintPreview();},
+  test:()=>{
+    if(!D.text.trim()){toast('Write a message first.','bad');return;}
+    const p=normPhone($('#c-test').value);if(!p.ok){toast(p.error,'bad');return;}
+    waTest(p.e164);},
+  when:t=>{D.when=t.dataset.v;render();},
+  'save-draft':()=>saveDraft(),launch:()=>launch(),...WAACT,
+  'new-broadcast':()=>{D=newDraft();},
+  'camp-edit':t=>{const c=camp(t.dataset.id);if(c)loadDraft(c);},
+  'camp-del':async t=>{const c=camp(t.dataset.id);if(!c)return;if(await confirmDialog({title:'Delete "'+esc(c.name)+'"?',body:'<p>This removes the '+c.status.toLowerCase()+' campaign.</p>',ok:'Delete',danger:true})){S.campaigns=S.campaigns.filter(x=>x.id!==c.id);save();toast('Campaign deleted');render();}},
+  'camp-unschedule':t=>{const c=camp(t.dataset.id);if(c){c.status='Draft';c.scheduledFor=null;save();toast('Schedule cancelled. Saved as a draft.');render();}},
+  'camp-now':async t=>{const c=camp(t.dataset.id);if(!c)return;if(await confirmDialog({title:'Send "'+esc(c.name)+'" now?',body:'<p>It will go to '+c.recipientIds.length+' recipients straight away.</p>',ok:'Send now'})){c.status='Sending';c.sentAt=now();c.scheduledFor=null;save();D=newDraft();D.runId=c.id;startRun(c.id);location.hash='broadcast';render();}},
+  retry:t=>retryFailed(t.dataset.id),
+  export:()=>exportCSV(),
+  'copy-csv':()=>copyText($('#csv-out').value),
+  copy:t=>copyText(t.dataset.text),
+  'apply-stop':t=>{const m=S.inbound.find(x=>x.id===t.dataset.id),c=m&&cont(m.from);if(c){c.consent='opted_out';m.applied=true;save();toast(c.name+' opted out. They are excluded from all future sends.','good');render();}},
+  reset:async()=>{if(await confirmDialog({title:'Reset demo data?',body:'<p>All contacts, templates and campaigns return to the sample data. This cannot be undone.</p>',ok:'Reset',danger:true})){Object.keys(runs).forEach(k=>{clearInterval(runs[k].timer);delete runs[k];});try{localStorage.removeItem(KEY);}catch(e){}S=seed();D=newDraft();U.contacts={q:'',g:'',c:''};save();toast('Demo data reset','good');location.hash='dashboard';render();}}
+};
+document.addEventListener('click',e=>{
+  if(e.target.classList&&e.target.classList.contains('scrim')){closeModal();return;}
+  const t=e.target.closest('[data-act]');if(!t||t.disabled)return;
+  const fn=A[t.dataset.act];if(fn){if(t.tagName==='A'&&t.dataset.act!=='new-broadcast')e.preventDefault();fn(t,e);}
+});
+document.addEventListener('keydown',e=>{
+  if(!mroot.firstChild)return;
+  if(e.key==='Escape'){closeModal();return;}
+  if(e.key==='Tab'){
+    const f=$$('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select,textarea',$('.modal',mroot)).filter(x=>x.offsetParent!==null);
+    if(!f.length)return;const a=f[0],b=f[f.length-1];
+    if(e.shiftKey&&document.activeElement===a){e.preventDefault();b.focus();}else if(!e.shiftKey&&document.activeElement===b){e.preventDefault();a.focus();}
+  }
+});
+document.addEventListener('submit',e=>{
+  const f=e.target;e.preventDefault();
+  if(f.id==='auth-form'){
+    const up=U.authMode==='up',err=$('#a-err'),em=$('#a-email').value.trim(),pw=$('#a-pass').value;
+    if(up&&!$('#a-name').value.trim()){err.textContent='Enter your name.';return;}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){err.textContent='Enter a valid email address.';return;}
+    if(pw.length<8){err.textContent='Use a password with at least 8 characters.';return;}
+    if(up&&pw!==$('#a-pass2').value){err.textContent='The passwords do not match.';return;}
+    if(up){S.user.name=$('#a-name').value.trim();S.user.business=$('#a-biz').value.trim()||S.user.business;}
+    S.user.email=em;S.session.signedIn=true;save();location.hash='dashboard';render();toast(up?'Account created (demo)':'Signed in (demo)','good');
+  }else if(f.id==='contact-form')submitContact(f);
+  else if(f.id==='group-form'){
+    const n=$('#g-name').value.trim(),id=f.dataset.id;if(!n){$('#g-err').textContent='Enter a group name.';return;}
+    if(S.groups.some(g=>g.name.toLowerCase()===n.toLowerCase()&&g.id!==id)){$('#g-err').textContent='A group with this name already exists.';return;}
+    if(id){const g=S.groups.find(x=>x.id===id);g.name=n;g.desc=$('#g-desc').value.trim();}else S.groups.push({id:uid('g'),name:n,desc:$('#g-desc').value.trim()});
+    save();closeModal();toast('Group saved','good');render();
+  }else if(f.id==='tmpl-form'){
+    const n=$('#t-name').value.trim(),b=$('#t-body').value.trim(),id=f.dataset.id,er=$('#t-err');
+    if(!n){er.textContent='Enter a template name.';return;}if(!b){er.textContent='Enter the message body.';return;}if(b.length>1024){er.textContent='The body is over 1,024 characters.';return;}
+    if(id){const t=S.templates.find(x=>x.id===id);t.name=n;t.category=$('#t-cat').value;if(t.body!==b){t.body=b;t.status='pending';}}else S.templates.push({id:uid('t'),name:n,category:$('#t-cat').value,status:'pending',body:b});
+    save();closeModal();toast('Template saved. It needs approval before live sending.','good');render();
+  }else if(f.id==='profile-form'){
+    const rate=+$('#p-rate').value,lg=+$('#p-large').value;
+    if(!(rate>=1&&rate<=80)){toast('Messages per second must be between 1 and 80.','bad');return;}
+    if(!(lg>=1)){toast('Enter a confirmation threshold of 1 or more.','bad');return;}
+    Object.assign(S.user,{name:$('#u-name').value.trim()||S.user.name,email:$('#u-email').value.trim(),business:$('#u-biz').value.trim()||S.user.business});
+    Object.assign(S.prefs,{cc:$('#p-cc').value,rate:Math.round(rate),largeThreshold:Math.round(lg)});save();toast('Preferences saved','good');render();
+  }
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='c-perm')D.permission=e.target.checked;
+});
+
+applyTheme();render();
+})();
+</script>
+
+</body></html>
